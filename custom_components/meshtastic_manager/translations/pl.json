@@ -34,7 +34,7 @@
   "selector": {
     "serial_port": {
       "options": {
-        "__manual__": "Wpisz ścieżkę ręcznie"
+        "manual": "Wpisz ścieżkę ręcznie"
       }
     }
   },

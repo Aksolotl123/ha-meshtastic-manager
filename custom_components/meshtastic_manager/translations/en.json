@@ -34,7 +34,7 @@
   "selector": {
     "serial_port": {
       "options": {
-        "__manual__": "Enter path manually"
+        "manual": "Enter path manually"
       }
     }
   },

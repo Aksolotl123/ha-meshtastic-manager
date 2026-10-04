@@ -31,7 +31,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-MANUAL_PATH = "__manual__"
+MANUAL_PATH = "manual"
 
 
 def _list_ports_pyserial() -> list[Any]:
