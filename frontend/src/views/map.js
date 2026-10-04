@@ -24,23 +24,51 @@ class MmMap extends LitElement {
   firstUpdated() {
     const el = this.renderRoot.querySelector("#map");
     this._map = L.map(el, { zoomControl: true, attributionControl: true }).setView([52, 19], 6);
-    // Same tile provider as the Home Assistant map (OSM blocks requests
-    // without a Referer, which the HA frontend does not send).
-    const dark = this.panel.hass?.themes?.darkMode;
-    L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/${dark ? "dark_all" : "voyager"}/{z}/{x}/{y}{r}.png`, {
-      maxZoom: 20,
-      subdomains: "abcd",
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(this._map);
+    this._addTiles();
     this._routeLayer = L.layerGroup().addTo(this._map);
     this._resize = new ResizeObserver(() => this._map.invalidateSize());
     this._resize.observe(el);
     this._sync();
   }
 
+  // Tiles come through Home Assistant's own OSM proxy (HA 2026.9+), which needs
+  // a short-lived token; OSM refuses direct requests without a Referer.
+  async _addTiles() {
+    const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    let token = null;
+    try {
+      token = (await this.panel.hass.connection.sendMessagePromise({ type: "map_tiles/access_token" })).token;
+    } catch {
+      /* older Home Assistant without the proxy */
+    }
+    if (!this._map) return;
+    if (token) {
+      this._tiles = L.tileLayer("/api/map_tiles/raster/{z}/{x}/{y}.png?token={token}", {
+        attribution,
+        maxZoom: 20,
+        maxNativeZoom: 19,
+        token,
+      }).addTo(this._map);
+      this._tokenTimer = setInterval(async () => {
+        try {
+          const fresh = await this.panel.hass.connection.sendMessagePromise({ type: "map_tiles/access_token" });
+          this._tiles.options.token = fresh.token;
+        } catch {
+          /* keep the old token */
+        }
+      }, 20 * 60 * 1000);
+    } else {
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution,
+        maxZoom: 19,
+        referrerPolicy: "origin",
+      }).addTo(this._map);
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
+    clearInterval(this._tokenTimer);
     this._resize?.disconnect();
     this._map?.remove();
     this._map = null;
@@ -104,7 +132,7 @@ class MmMap extends LitElement {
         .filter(Boolean)
         .map((pos) => [pos.lat, pos.lon]);
       if (path.length > 1) {
-        L.polyline(path, { color: "#9c27b0", weight: 2, dashArray: "6 6", opacity: 0.8 }).addTo(this._routeLayer);
+        L.polyline(path, { color: "#e040fb", weight: 3, dashArray: "8 6", opacity: 0.9 }).addTo(this._routeLayer);
       }
     }
   }
@@ -144,6 +172,9 @@ class MmMap extends LitElement {
         position: absolute;
         inset: 0;
         background: var(--secondary-background-color);
+      }
+      .wrap.dark .leaflet-tile-pane {
+        filter: invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(0.9);
       }
       .overlay {
         position: absolute;
