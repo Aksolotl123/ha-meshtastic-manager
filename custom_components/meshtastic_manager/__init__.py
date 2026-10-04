@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -16,7 +17,6 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
 
 from . import websocket_api
 from .client import MeshtasticClient
@@ -166,7 +166,9 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     if hass.data.get(_DATA_PANEL):
         return
     hass.data[_DATA_PANEL] = True
-    integration = await async_get_integration(hass, DOMAIN)
+    # Version the URL by content so browsers never keep a stale panel after an update.
+    bundle = Path(__file__).parent / "frontend" / f"{PANEL_ELEMENT}.js"
+    digest = await hass.async_add_executor_job(_file_digest, bundle)
     frontend_dir = Path(__file__).parent / "frontend"
     if not hass.data.get(f"{DOMAIN}_static"):
         await hass.http.async_register_static_paths(
@@ -179,8 +181,12 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         webcomponent_name=PANEL_ELEMENT,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        module_url=f"{PANEL_STATIC_URL}/{PANEL_ELEMENT}.js?v={integration.version}",
+        module_url=f"{PANEL_STATIC_URL}/{PANEL_ELEMENT}.js?v={digest}",
         embed_iframe=False,
         require_admin=False,
         config={"domain": DOMAIN},
     )
+
+
+def _file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:12]

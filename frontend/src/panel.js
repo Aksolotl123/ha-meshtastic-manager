@@ -6,6 +6,7 @@ import "./views/messages.js";
 import "./views/nodes.js";
 import "./views/map.js";
 import "./views/config.js";
+import "./views/channels.js";
 import "./views/node-dialog.js";
 import "./views/confirm-dialog.js";
 
@@ -13,6 +14,7 @@ const DOMAIN = "meshtastic_manager";
 const TABS = [
   ["radio", "mdi:radio-handheld"],
   ["messages", "mdi:message-text"],
+  ["channels", "mdi:pound"],
   ["nodes", "mdi:account-group"],
   ["map", "mdi:map"],
   ["config", "mdi:cog"],
@@ -289,6 +291,13 @@ class MeshtasticManagerPanel extends LitElement {
     storageSet("meshtastic_manager.tab", tab);
   }
 
+  // Jump to the Channels tab and open one of its dialogs ("add" or "import").
+  openChannels(action = null) {
+    this.pendingChannelAction = action;
+    this._setTab("channels");
+    this.bump();
+  }
+
   render() {
     const t = this.t;
     const connected = this.data?.status?.connected;
@@ -359,6 +368,15 @@ class MeshtasticManagerPanel extends LitElement {
           return html`<mm-map .panel=${this} .rev=${this._rev}></mm-map>`;
         case "config":
           return html`<mm-config .panel=${this} .rev=${this._rev}></mm-config>`;
+        case "channels":
+          return html`<div class="narrow-page">
+            <mm-channels
+              .panel=${this}
+              .rev=${this._rev}
+              .channels=${this.data.channels}
+              .lora=${this.data.lora}
+            ></mm-channels>
+          </div>`;
         default:
           return html`<mm-radio .panel=${this} .rev=${this._rev}></mm-radio>`;
       }
@@ -465,6 +483,10 @@ class MeshtasticManagerPanel extends LitElement {
       .content.full > :last-child {
         flex: 1;
         min-height: 0;
+      }
+      .narrow-page {
+        max-width: 900px;
+        margin: 0 auto;
       }
       .center {
         max-width: 600px;

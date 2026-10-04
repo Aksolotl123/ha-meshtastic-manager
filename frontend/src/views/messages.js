@@ -102,6 +102,16 @@ class MmMessages extends LitElement {
       <div class="layout">
         ${showList
           ? html`<div class="sidebar">
+              ${p.isAdmin
+                ? html`<div class="sidebar-actions">
+                    <button class="btn" ?disabled=${!p.data.status.connected} @click=${() => p.openChannels("add")}>
+                      <ha-icon icon="mdi:plus"></ha-icon>${t("new_channel")}
+                    </button>
+                    <button class="btn" ?disabled=${!p.data.status.connected} @click=${() => p.openChannels("import")}>
+                      <ha-icon icon="mdi:link-plus"></ha-icon>${t("join_short")}
+                    </button>
+                  </div>`
+                : ""}
               ${items.map((c) => this._renderItem(c, open))}
             </div>`
           : ""}
@@ -302,6 +312,17 @@ class MmMessages extends LitElement {
       .layout > .sidebar:only-child {
         width: 100%;
         border-right: none;
+      }
+      .sidebar-actions {
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--divider-color);
+      }
+      .sidebar-actions .btn {
+        flex: 1;
+        justify-content: center;
+        font-size: 0.9em;
       }
       .item {
         font: inherit;

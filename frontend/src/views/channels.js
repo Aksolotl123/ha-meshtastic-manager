@@ -62,7 +62,17 @@ class MmChannels extends LitElement {
   }
 
   get _connected() {
-    return this.panel.data?.status?.connected;
+    // Channel commands are admin-only (share links contain the keys).
+    return this.panel.data?.status?.connected && this.panel.isAdmin;
+  }
+
+  updated() {
+    const action = this.panel?.pendingChannelAction;
+    if (action && this._connected) {
+      this.panel.pendingChannelAction = null;
+      if (action === "add") this._openAdd();
+      else if (action === "import") this._openImport();
+    }
   }
 
   _active() {
@@ -88,6 +98,7 @@ class MmChannels extends LitElement {
           </button>
         </div>
         ${full ? html`<div class="muted small">${t("channels_full")}</div>` : ""}
+        ${this.panel.isAdmin ? "" : html`<div class="muted small">${t("admin_only")}</div>`}
         <div class="list">${active.map((c) => this._renderChannel(c))}</div>
       </div>
       ${this._renderDialog()}

@@ -69,7 +69,12 @@ class MmRadio extends LitElement {
         </div>
 
         <div class="card wide">
-          <h2>${t("channels")}</h2>
+          <div class="row card-head">
+            <h2 class="grow">${t("channels")}</h2>
+            <button class="btn" @click=${() => p.openChannels()}>
+              <ha-icon icon="mdi:pencil"></ha-icon>${t("manage_channels")}
+            </button>
+          </div>
           <table>
             <thead>
               <tr><th>#</th><th>${t("name")}</th><th>${t("role")}</th><th>${t("psk")}</th><th>MQTT</th></tr>
@@ -174,6 +179,12 @@ class MmRadio extends LitElement {
       }
       .wide {
         grid-column: 1 / -1;
+      }
+      .card-head {
+        margin-bottom: 12px;
+      }
+      .card-head h2 {
+        margin: 0;
       }
       .actions {
         display: flex;
