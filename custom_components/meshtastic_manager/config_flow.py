@@ -78,7 +78,12 @@ class MeshtasticManagerConfigFlow(ConfigFlow, domain=DOMAIN):
         except BaseException as err:  # noqa: BLE001 - library may raise SystemExit
             if isinstance(err, asyncio.CancelledError):
                 raise
-            _LOGGER.warning("Cannot connect to Meshtastic radio: %s", err)
+            target = data.get(CONF_DEVICE) or f"{data.get(CONF_HOST)}:{data.get(CONF_PORT)}"
+            _LOGGER.warning("Cannot connect to Meshtastic radio at %s: %s", target, err)
+            # The port opened but nothing answered the Meshtastic handshake:
+            # most likely not a Meshtastic radio (e.g. the board's own UART).
+            if "Timed out" in str(err) or isinstance(err, TimeoutError):
+                return None, "no_response"
             return None, "cannot_connect"
         return info, None
 
@@ -123,6 +128,9 @@ class MeshtasticManagerConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             for port in ports
         ]
+        if not errors and not any(getattr(port, "vid", None) for port in ports):
+            # Only built-in UARTs (e.g. /dev/ttyAMA10 on a Raspberry Pi 5) are present.
+            errors["base"] = "no_usb_ports"
         options.append(SelectOptionDict(value=MANUAL_PATH, label="Enter path manually"))
         return self.async_show_form(
             step_id="serial",

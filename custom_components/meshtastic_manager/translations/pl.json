@@ -11,21 +11,32 @@
       "serial": {
         "title": "Port szeregowy",
         "description": "Wybierz port, do którego podłączone jest radio Meshtastic. Łączenie może potrwać do minuty, bo radio przesyła swoją bazę węzłów.",
-        "data": { "device": "Port" }
+        "data": {
+          "device": "Port"
+        }
       },
       "serial_manual": {
         "title": "Ścieżka portu szeregowego",
-        "data": { "device": "Ścieżka urządzenia" },
-        "data_description": { "device": "Najlepiej stała ścieżka /dev/serial/by-id/…" }
+        "data": {
+          "device": "Ścieżka urządzenia"
+        },
+        "data_description": {
+          "device": "Najlepiej stała ścieżka /dev/serial/by-id/…"
+        }
       },
       "tcp": {
         "title": "Radio sieciowe",
-        "data": { "host": "Host", "port": "Port" }
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
       }
     },
     "error": {
       "cannot_connect": "Nie udało się połączyć z radiem. Sprawdź port i czy żaden inny program go nie używa.",
-      "timeout": "Radio nie przesłało konfiguracji w wyznaczonym czasie."
+      "timeout": "Radio nie przesłało konfiguracji w wyznaczonym czasie.",
+      "no_response": "Port się otworzył, ale nic nie odpowiedziało jak radio Meshtastic. To najpewniej nie jest radio (np. /dev/ttyAMA10 to wbudowany port diagnostyczny Raspberry Pi) albo radio ma wyłączone API szeregowe.",
+      "no_usb_ports": "Nie wykryto żadnego urządzenia USB-serial. Porty typu /dev/ttyAMA… należą do samej płytki, a nie do radia. Sprawdź, czy radio jest włączone i czy kabel USB przesyła dane (nie tylko ładuje), a potem otwórz ten krok ponownie."
     },
     "abort": {
       "already_configured": "To radio jest już skonfigurowane."
@@ -40,7 +51,9 @@
   },
   "entity": {
     "binary_sensor": {
-      "connected": { "name": "Połączenie" }
+      "connected": {
+        "name": "Połączenie"
+      }
     },
     "event": {
       "message": {
@@ -56,18 +69,42 @@
       }
     },
     "sensor": {
-      "battery": { "name": "Bateria" },
-      "voltage": { "name": "Napięcie" },
-      "channel_utilization": { "name": "Wykorzystanie kanału" },
-      "air_util_tx": { "name": "Czas nadawania (TX)" },
-      "uptime": { "name": "Czas pracy" },
-      "nodes_online": { "name": "Węzły online" },
-      "nodes_total": { "name": "Znane węzły" },
-      "messages_today": { "name": "Wiadomości dzisiaj" },
-      "packets_tx": { "name": "Pakiety wysłane" },
-      "packets_rx": { "name": "Pakiety odebrane" },
-      "packets_rx_bad": { "name": "Błędne pakiety" },
-      "packets_relayed": { "name": "Pakiety przekazane" }
+      "battery": {
+        "name": "Bateria"
+      },
+      "voltage": {
+        "name": "Napięcie"
+      },
+      "channel_utilization": {
+        "name": "Wykorzystanie kanału"
+      },
+      "air_util_tx": {
+        "name": "Czas nadawania (TX)"
+      },
+      "uptime": {
+        "name": "Czas pracy"
+      },
+      "nodes_online": {
+        "name": "Węzły online"
+      },
+      "nodes_total": {
+        "name": "Znane węzły"
+      },
+      "messages_today": {
+        "name": "Wiadomości dzisiaj"
+      },
+      "packets_tx": {
+        "name": "Pakiety wysłane"
+      },
+      "packets_rx": {
+        "name": "Pakiety odebrane"
+      },
+      "packets_rx_bad": {
+        "name": "Błędne pakiety"
+      },
+      "packets_relayed": {
+        "name": "Pakiety przekazane"
+      }
     }
   },
   "services": {
@@ -75,18 +112,40 @@
       "name": "Wyślij wiadomość",
       "description": "Wysyła wiadomość tekstową przez sieć mesh.",
       "fields": {
-        "config_entry_id": { "name": "Radio", "description": "Radio, z którego wysłać (wymagane, gdy jest ich kilka)." },
-        "text": { "name": "Treść", "description": "Treść wiadomości (maks. 200 bajtów)." },
-        "to": { "name": "Do", "description": "Id węzła, np. !a1b2c3d4. Puste = wiadomość na kanał." },
-        "channel": { "name": "Kanał", "description": "Numer kanału 0-7." }
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio, z którego wysłać (wymagane, gdy jest ich kilka)."
+        },
+        "text": {
+          "name": "Treść",
+          "description": "Treść wiadomości (maks. 200 bajtów)."
+        },
+        "to": {
+          "name": "Do",
+          "description": "Id węzła, np. !a1b2c3d4. Puste = wiadomość na kanał."
+        },
+        "channel": {
+          "name": "Kanał",
+          "description": "Numer kanału 0-7."
+        }
       }
     }
   },
   "exceptions": {
-    "text_too_long": { "message": "Wiadomość jest dłuższa niż 200 bajtów." },
-    "invalid_node": { "message": "Nieprawidłowe id węzła." },
-    "not_connected": { "message": "Radio nie jest połączone." },
-    "no_entry": { "message": "Nie skonfigurowano żadnego radia Meshtastic." },
-    "entry_required": { "message": "Skonfigurowano kilka radiów — wybierz jedno." }
+    "text_too_long": {
+      "message": "Wiadomość jest dłuższa niż 200 bajtów."
+    },
+    "invalid_node": {
+      "message": "Nieprawidłowe id węzła."
+    },
+    "not_connected": {
+      "message": "Radio nie jest połączone."
+    },
+    "no_entry": {
+      "message": "Nie skonfigurowano żadnego radia Meshtastic."
+    },
+    "entry_required": {
+      "message": "Skonfigurowano kilka radiów — wybierz jedno."
+    }
   }
 }
