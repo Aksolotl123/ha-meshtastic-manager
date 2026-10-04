@@ -161,6 +161,8 @@ class MeshtasticManagerPanel extends LitElement {
       this.data = data;
       this.nodes = new Map(data.nodes.map((n) => [n.num, n]));
       this.traceroutes = await this.ws("traceroutes");
+      // The radio may have rebooted (e.g. after a config change): reload settings.
+      this.configStale = true;
       this._error = null;
     } catch (err) {
       this._error = err.message || String(err);

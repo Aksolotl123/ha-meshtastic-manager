@@ -8,6 +8,7 @@ const STATUS_ICONS = {
   sent: "mdi:check",
   delivered: "mdi:check-all",
   failed: "mdi:alert-circle-outline",
+  unconfirmed: "mdi:help-circle-outline",
 };
 
 class MmMessages extends LitElement {

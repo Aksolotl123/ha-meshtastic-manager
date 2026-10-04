@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_call_later
 
 from .const import (
     BROADCAST_NUM,
@@ -50,6 +51,8 @@ TOPIC_NODE = "meshtastic.node.updated"
 
 # Routing ACKs can arrive before the executor job that sent the packet returns.
 EARLY_ACK_TTL = 120
+# Without any ACK (e.g. a broadcast nobody rebroadcast) give up waiting after this.
+ACK_TIMEOUT = 90
 
 
 def sanitize(value: Any) -> Any:
@@ -500,7 +503,18 @@ class MeshtasticClient:
         if early is not None:
             self._apply_ack(packet.id, early[1])
             message = self.store.find_outgoing(packet.id) or message
+        else:
+            async_call_later(
+                self.hass, ACK_TIMEOUT, callback(lambda _now: self._ack_timeout(packet.id))
+            )
         return message
+
+    @callback
+    def _ack_timeout(self, packet_id: int) -> None:
+        message = self.store.find_outgoing(packet_id)
+        if message is not None and message["status"] == "pending":
+            self.store.update_message(packet_id, status="unconfirmed")
+            self._emit({"type": "message_status", "id": packet_id, "status": "unconfirmed", "error": None})
 
     async def async_send_data(
         self, port: str, payload: Any, to: int, channel: int = 0, want_response: bool = True

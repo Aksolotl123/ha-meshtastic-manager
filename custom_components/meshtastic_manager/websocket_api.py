@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import wraps
+import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -14,6 +15,8 @@ from .const import DOMAIN, MAX_TEXT_BYTES
 
 if TYPE_CHECKING:
     from .client import MeshtasticClient
+
+_LOGGER = logging.getLogger(__name__)
 
 PREFIX = DOMAIN
 
@@ -40,6 +43,9 @@ def _with_client(func):
             connection.send_error(msg["id"], "not_connected", str(err))
         except (ValueError, KeyError) as err:
             connection.send_error(msg["id"], "invalid_format", str(err))
+        except Exception as err:  # noqa: BLE001 - serial/socket/library errors
+            _LOGGER.warning("Meshtastic command %s failed: %s", msg["type"], err)
+            connection.send_error(msg["id"], "radio_error", str(err) or type(err).__name__)
 
     return wrapper
 

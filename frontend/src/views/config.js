@@ -26,11 +26,16 @@ class MmConfig extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (this.panel) this.panel.configStale = false;
     if (this.panel?.isAdmin && this.panel?.data?.status?.connected) this._load();
   }
 
   updated(changed) {
     const connected = this.panel?.data?.status?.connected;
+    if (this.panel?.configStale && this._cfg && !this._dirty && connected) {
+      this.panel.configStale = false;
+      this._cfg = null;
+    }
     if (changed.has("rev") && connected && !this._cfg && !this._loading && this.panel.isAdmin) this._load();
   }
 
@@ -94,6 +99,11 @@ class MmConfig extends LitElement {
     const s = this._section;
     if (s === "owner") {
       await this._run(() => p.ws("owner_set", this._draft));
+      const me = p.myNode;
+      if (me?.user) {
+        me.user = { ...me.user, longName: this._draft.long_name, shortName: this._draft.short_name };
+        p.bump();
+      }
       this._cfg.owner = {
         ...this._cfg.owner,
         longName: this._draft.long_name,
@@ -113,6 +123,9 @@ class MmConfig extends LitElement {
     const ch = this._draft[index];
     await this._run(() => p.ws("channel_set", { index, role: ch.role, settings: ch.settings || {} }));
     this._cfg.channels[index] = structuredClone(ch);
+    // Channel names and roles are shown on other tabs too.
+    p.data.channels = structuredClone(this._draft);
+    p.bump();
   }
 
   render() {

@@ -34,6 +34,13 @@ _LOGGER = logging.getLogger(__name__)
 MANUAL_PATH = "__manual__"
 
 
+def _list_ports_pyserial() -> list[Any]:
+    """Fallback port scan for Home Assistant versions before 2026.5."""
+    from serial.tools import list_ports  # noqa: PLC0415
+
+    return list(list_ports.comports())
+
+
 def _probe(data: dict[str, Any]) -> dict[str, Any]:
     """Connect once, read node identity, disconnect. Runs in the executor."""
     from .client import _close_iface, _connect_iface, _create_iface  # noqa: PLC0415
@@ -75,6 +82,10 @@ class MeshtasticManagerConfigFlow(ConfigFlow, domain=DOMAIN):
             return None, "cannot_connect"
         return info, None
 
+    async def _stable_path(self, device: str) -> str:
+        """Prefer /dev/serial/by-id/... so a reboot or replug cannot renumber the port."""
+        return await self.hass.async_add_executor_job(usb.get_serial_by_id, device)
+
     async def _async_finish(self, data: dict[str, Any], info: dict[str, Any]) -> ConfigFlowResult:
         await self.async_set_unique_id(f"{info['num']:08x}")
         self._abort_if_unique_id_configured(updates=data)
@@ -88,13 +99,16 @@ class MeshtasticManagerConfigFlow(ConfigFlow, domain=DOMAIN):
             device = user_input[CONF_DEVICE]
             if device == MANUAL_PATH:
                 return await self.async_step_serial_manual()
-            data = {CONF_CONNECTION_TYPE: CONNECTION_SERIAL, CONF_DEVICE: device}
+            data = {CONF_CONNECTION_TYPE: CONNECTION_SERIAL, CONF_DEVICE: await self._stable_path(device)}
             info, error = await self._async_validate(data)
             if info is not None:
                 return await self._async_finish(data, info)
             errors["base"] = error or "cannot_connect"
 
-        ports = await usb.async_scan_serial_ports(self.hass)
+        if hasattr(usb, "async_scan_serial_ports"):
+            ports = await usb.async_scan_serial_ports(self.hass)
+        else:
+            ports = await self.hass.async_add_executor_job(_list_ports_pyserial)
         options = [
             SelectOptionDict(
                 value=port.device,
@@ -132,7 +146,10 @@ class MeshtasticManagerConfigFlow(ConfigFlow, domain=DOMAIN):
         """Enter a serial device path."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            data = {CONF_CONNECTION_TYPE: CONNECTION_SERIAL, CONF_DEVICE: user_input[CONF_DEVICE]}
+            data = {
+                CONF_CONNECTION_TYPE: CONNECTION_SERIAL,
+                CONF_DEVICE: await self._stable_path(user_input[CONF_DEVICE]),
+            }
             info, error = await self._async_validate(data)
             if info is not None:
                 return await self._async_finish(data, info)
