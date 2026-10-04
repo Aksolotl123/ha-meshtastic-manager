@@ -102,7 +102,9 @@ conditions:
 
 actions:
   - variables:
-      code: "{{ range(100000, 1000000) | random }}"
+      # The template sandbox limits range() to 100000 items: build 6 digits
+      # from two parts (first digit never 0, so the code stays 6 digits long).
+      code: "{{ (range(100, 1000) | random) ~ ('%03d' % (range(1000) | random)) }}"
       who: "{{ trigger.event.data.from_name or sender }}"
   - action: meshtastic_manager.send_text
     data:
