@@ -208,7 +208,7 @@
         },
         "url": {
           "name": "Link",
-          "description": "Link kanału, np. https://meshtastic.org/e/#..."
+          "description": "Link kanału skopiowany z aplikacji Meshtastic (Udostępnij kanał / kod QR)."
         },
         "replace": {
           "name": "Zastąp wszystko",

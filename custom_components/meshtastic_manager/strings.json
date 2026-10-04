@@ -208,7 +208,7 @@
         },
         "url": {
           "name": "Link",
-          "description": "Channel link such as https://meshtastic.org/e/#..."
+          "description": "Channel share link copied from the Meshtastic app (Share channel / QR code)."
         },
         "replace": {
           "name": "Replace everything",
