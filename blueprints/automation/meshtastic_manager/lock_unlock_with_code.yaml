@@ -2,8 +2,9 @@ blueprint:
   name: Meshtastic - unlock with a one-time code
   description: >-
     Unlocks a lock when a chosen Meshtastic radio sends the open word and then
-    answers the random 6-digit code Home Assistant sends back. A recorded or
-    replayed message cannot open the lock because the code changes every time.
+    answers the random code (4-6 digits) Home Assistant sends back. A recorded
+    or replayed message cannot open the lock because the code changes every
+    time, and each code accepts only one answer.
     Without a channel name only encrypted direct messages (PKI, firmware 2.5+)
     are accepted, which also prove who the sender is. On a channel, anyone who
     knows the channel key can read the code, so keep that key private.
@@ -44,6 +45,15 @@ blueprint:
       selector:
         text:
           multiple: true
+    code_length:
+      name: Code length
+      description: Number of digits of the one-time code.
+      default: 6
+      selector:
+        number:
+          min: 4
+          max: 6
+          mode: box
     code_timeout:
       name: Time to answer the code
       default: 90
@@ -79,6 +89,7 @@ variables:
   channel_name: !input channel_name
   lock_entity: !input lock_entity
   open_words: !input open_words
+  code_length: !input code_length
   code_timeout: !input code_timeout
   relock_minutes: !input relock_minutes
   # Replies go back the way the command came: on the channel, or as a DM.
@@ -102,9 +113,10 @@ conditions:
 
 actions:
   - variables:
-      # The template sandbox limits range() to 100000 items: build 6 digits
-      # from two parts (first digit never 0, so the code stays 6 digits long).
-      code: "{{ (range(100, 1000) | random) ~ ('%03d' % (range(1000) | random)) }}"
+      # The template sandbox limits range() to 100000 items, so 6 digits are
+      # built from two parts. The first digit is never 0, so the code keeps
+      # its length when Home Assistant turns it into a number.
+      code: "{% set n = code_length | int(6) %}{% if n <= 5 %}{{ range(10 ** (n - 1), 10 ** n) | random }}{% else %}{{ (range(100, 1000) | random) ~ ('%03d' % (range(1000) | random)) }}{% endif %}"
       who: "{{ trigger.event.data.from_name or sender }}"
   - action: meshtastic_manager.send_text
     data:

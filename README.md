@@ -61,8 +61,8 @@ the event again.
 
 - **Unlock with a one-time code**
   ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_unlock_with_code.yaml)):
-  you send `otwórz` / `open`, Home Assistant answers with a random 6-digit code, and the lock
-  opens only if you send that code back within the time limit. A recorded or replayed message
+  you send `otwórz` / `open`, Home Assistant answers with a random code of 4-6 digits, and the
+  lock opens only if you send that code back within the time limit. Each code accepts one answer. A recorded or replayed message
   cannot open the door because the code changes every time. Optionally the lock is locked again
   after N minutes, and every attempt, successful or not, triggers your notification action.
 - **Lock with a message**
