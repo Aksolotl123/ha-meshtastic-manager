@@ -6,24 +6,19 @@ import hashlib
 import logging
 from pathlib import Path
 
-import voluptuous as vol
-
 from homeassistant.components import panel_custom
 from homeassistant.components.frontend import async_remove_panel
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from . import websocket_api
+from . import services, websocket_api
 from .client import MeshtasticClient
 from .const import (
-    BROADCAST_NUM,
     DOMAIN,
-    MAX_TEXT_BYTES,
     PANEL_ELEMENT,
     PANEL_ICON,
     PANEL_STATIC_URL,
@@ -40,82 +35,15 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type MeshtasticConfigEntry = ConfigEntry[MeshtasticClient]
 
-SERVICE_SEND_TEXT = "send_text"
-SEND_TEXT_SCHEMA = vol.Schema(
-    {
-        vol.Optional("config_entry_id"): cv.string,
-        vol.Required("text"): cv.string,
-        vol.Optional("to"): cv.string,
-        vol.Optional("channel", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=7)),
-    }
-)
-
 _DATA_PANEL = f"{DOMAIN}_panel"
-
-
-def parse_node(value: str | int | None) -> int:
-    """Parse '!a1b2c3d4', 'a1b2c3d4', a decimal string or int into a node number."""
-    if value is None or value in ("", "broadcast", "^all"):
-        return BROADCAST_NUM
-    if isinstance(value, int):
-        return value
-    text = value.strip()
-    if text.startswith("!"):
-        return int(text[1:], 16)
-    if text.isdigit():
-        return int(text)
-    return int(text, 16)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register WebSocket commands and actions."""
     websocket_api.async_register(hass)
 
-    async def _send_text(call: ServiceCall) -> dict:
-        client = _client_for_call(hass, call.data.get("config_entry_id"))
-        text: str = call.data["text"]
-        if len(text.encode()) > MAX_TEXT_BYTES:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="text_too_long"
-            )
-        try:
-            to = parse_node(call.data.get("to"))
-        except ValueError as err:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="invalid_node"
-            ) from err
-        try:
-            message = await client.async_send_text(text, to, call.data["channel"])
-        except ConnectionError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN, translation_key="not_connected"
-            ) from err
-        return {"id": message["id"]}
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SEND_TEXT,
-        _send_text,
-        schema=SEND_TEXT_SCHEMA,
-        supports_response=SupportsResponse.OPTIONAL,
-    )
+    services.async_setup_services(hass)
     return True
-
-
-def _client_for_call(hass: HomeAssistant, entry_id: str | None) -> MeshtasticClient:
-    entries = [
-        e for e in hass.config_entries.async_loaded_entries(DOMAIN)
-        if entry_id is None or e.entry_id == entry_id
-    ]
-    if not entries:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN, translation_key="no_entry"
-        )
-    if entry_id is None and len(entries) > 1:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN, translation_key="entry_required"
-        )
-    return entries[0].runtime_data
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MeshtasticConfigEntry) -> bool:

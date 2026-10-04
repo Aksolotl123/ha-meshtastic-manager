@@ -47,6 +47,14 @@
       "options": {
         "manual": "Wpisz ścieżkę ręcznie"
       }
+    },
+    "channel_key": {
+      "options": {
+        "random": "Losowy klucz prywatny",
+        "default": "Publiczny klucz domyślny",
+        "none": "Bez szyfrowania",
+        "custom": "Własny klucz"
+      }
     }
   },
   "entity": {
@@ -126,7 +134,85 @@
         },
         "channel": {
           "name": "Kanał",
-          "description": "Numer kanału 0-7."
+          "description": "Numer kanału 0-7 (domyślnie 0)."
+        },
+        "channel_name": {
+          "name": "Nazwa kanału",
+          "description": "Wyślij na kanał o tej nazwie zamiast podawać numer."
+        }
+      }
+    },
+    "add_channel": {
+      "name": "Dodaj kanał",
+      "description": "Tworzy kanał dodatkowy w pierwszym wolnym slocie. Udostępnij go w panelu Meshtastic (kod QR), żeby inne radia mogły dołączyć.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio do skonfigurowania (wymagane, gdy jest ich kilka)."
+        },
+        "name": {
+          "name": "Nazwa",
+          "description": "Nazwa kanału, maks. 11 bajtów (polskie litery zajmują 2)."
+        },
+        "key": {
+          "name": "Klucz szyfrowania",
+          "description": "Losowy klucz 256-bit (prywatny), publiczny klucz domyślny, brak albo własny klucz."
+        },
+        "psk": {
+          "name": "Własny klucz",
+          "description": "Klucz base64 o długości 16 lub 32 bajtów, gdy wybrano własny klucz."
+        },
+        "position_precision": {
+          "name": "Dokładność pozycji",
+          "description": "0 = nie wysyłaj pozycji na tym kanale, 32 = dokładna, 13 = ok. 2,9 km."
+        },
+        "uplink": {
+          "name": "MQTT uplink",
+          "description": "Przekazuj ten kanał do MQTT."
+        },
+        "downlink": {
+          "name": "MQTT downlink",
+          "description": "Odbieraj ten kanał z MQTT."
+        },
+        "muted": {
+          "name": "Wyciszony",
+          "description": "Bez powiadomień na radiu dla tego kanału."
+        }
+      }
+    },
+    "delete_channel": {
+      "name": "Usuń kanał",
+      "description": "Usuwa kanał dodatkowy po nazwie albo numerze. Kolejne kanały przesuwają się o jedno miejsce w górę.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio do skonfigurowania (wymagane, gdy jest ich kilka)."
+        },
+        "name": {
+          "name": "Nazwa",
+          "description": "Nazwa kanału do usunięcia."
+        },
+        "index": {
+          "name": "Numer",
+          "description": "Slot 1-7 kanału do usunięcia (zamiast nazwy)."
+        }
+      }
+    },
+    "join_channel": {
+      "name": "Dołącz do kanału z linku",
+      "description": "Dodaje kanały z linku Meshtastic. Z opcją „zastąp” podmienia wszystkie kanały i ustawienia LoRa, a radio się restartuje.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio do skonfigurowania (wymagane, gdy jest ich kilka)."
+        },
+        "url": {
+          "name": "Link",
+          "description": "Link kanału, np. https://meshtastic.org/e/#..."
+        },
+        "replace": {
+          "name": "Zastąp wszystko",
+          "description": "Zastąp wszystkie kanały i ustawienia LoRa (restart radia) zamiast dodawać."
         }
       }
     }
@@ -146,6 +232,12 @@
     },
     "entry_required": {
       "message": "Skonfigurowano kilka radiów — wybierz jedno."
+    },
+    "invalid_channel": {
+      "message": "Odrzucono zmianę kanału: {error}"
+    },
+    "channel_not_found": {
+      "message": "Nie ma kanału o nazwie {name}."
     }
   }
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import voluptuous as vol
@@ -50,6 +51,8 @@ def _probe(data: dict[str, Any]) -> dict[str, Any]:
         _connect_iface(iface)
         num = iface.myInfo.my_node_num
         user = (iface.nodesByNum or {}).get(num, {}).get("user", {})
+        # Let the library send its first heartbeat before the port is closed.
+        time.sleep(0.5)
         return {"num": num, "long_name": user.get("longName"), "short_name": user.get("shortName")}
     finally:
         _close_iface(iface)

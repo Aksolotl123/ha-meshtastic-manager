@@ -367,15 +367,51 @@ class FakeRadio:
             print("client disconnected")
 
 
+def control_loop(radio: FakeRadio, host: str, port: int) -> None:
+    """Inject text messages for automation tests.
+
+    Each UDP datagram is "<from hex>|<channel index or dm>|<text>", e.g.
+    "10000000|1|otworz" (channel 1) or "10000000|dm|otworz" (PKI direct message).
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((host, port))
+    print(f"Control port (UDP) on {host}:{port}")
+    while True:
+        data, _ = sock.recvfrom(1024)
+        try:
+            sender_hex, channel, text = data.decode().split("|", 2)
+            sender = int(sender_hex, 16)
+            direct = channel == "dm"
+            fr = radio.packet(
+                sender,
+                MY_NUM if direct else BROADCAST,
+                portnums_pb2.PortNum.TEXT_MESSAGE_APP,
+                text.encode(),
+                channel=0 if direct else int(channel),
+            )
+            if direct:
+                fr.packet.pki_encrypted = True
+            radio.send(fr)
+            print(f"INJECT from {sender:08x} {'DM' if direct else 'ch' + channel}: {text}")
+        except Exception as err:  # noqa: BLE001
+            print("bad control message:", err)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=4403)
+    parser.add_argument("--control-port", type=int, default=4404)
     parser.add_argument("--lat", type=float, default=52.2297)
     parser.add_argument("--lon", type=float, default=21.0122)
+    parser.add_argument("--quiet", action="store_true", help="no random chatter")
     args = parser.parse_args()
     radio = FakeRadio(args.lat, args.lon)
-    threading.Thread(target=radio.chatter_loop, daemon=True).start()
+    if not args.quiet:
+        threading.Thread(target=radio.chatter_loop, daemon=True).start()
+    threading.Thread(
+        target=control_loop, args=(radio, args.host, args.control_port), daemon=True
+    ).start()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((args.host, args.port))

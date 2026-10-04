@@ -9,8 +9,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import MeshtasticConfigEntry
-from .client import node_id
-from .const import BROADCAST_NUM
 from .entity import MeshtasticEntity
 
 EVENT_DIRECT = "direct_message"
@@ -47,20 +45,7 @@ class MeshtasticMessageEvent(MeshtasticEntity, EventEntity):
         message = event["message"]
         if message.get("dir") != "in":
             return
-        sender = self.client.node(message["from"]) or {}
-        user = sender.get("user") or {}
-        direct = message["to"] != BROADCAST_NUM
-        self._trigger_event(
-            EVENT_DIRECT if direct else EVENT_CHANNEL,
-            {
-                "text": message["text"],
-                "from": node_id(message["from"]),
-                "from_name": user.get("longName"),
-                "from_short_name": user.get("shortName"),
-                "channel": message["channel"],
-                "snr": message.get("snr"),
-                "rssi": message.get("rssi"),
-                "hops": message.get("hops"),
-            },
-        )
+        data = self.client.message_event_data(message)
+        data.pop("entry_id", None)
+        self._trigger_event(EVENT_DIRECT if data["direct"] else EVENT_CHANNEL, data)
         self.async_write_ha_state()

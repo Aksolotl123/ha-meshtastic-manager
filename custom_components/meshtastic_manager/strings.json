@@ -47,6 +47,14 @@
       "options": {
         "manual": "Enter path manually"
       }
+    },
+    "channel_key": {
+      "options": {
+        "random": "Random private key",
+        "default": "Public default key",
+        "none": "No encryption",
+        "custom": "Own key"
+      }
     }
   },
   "entity": {
@@ -126,7 +134,85 @@
         },
         "channel": {
           "name": "Channel",
-          "description": "Channel index 0-7."
+          "description": "Channel index 0-7 (default 0)."
+        },
+        "channel_name": {
+          "name": "Channel name",
+          "description": "Send on the channel with this name instead of an index."
+        }
+      }
+    },
+    "add_channel": {
+      "name": "Add channel",
+      "description": "Creates a secondary channel in the first free slot. Share it from the Meshtastic panel (QR code) so other radios can join.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio to configure (required when more than one is configured)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Channel name, up to 11 bytes (Polish letters take 2)."
+        },
+        "key": {
+          "name": "Encryption key",
+          "description": "Random 256-bit key (private), the public default key, none, or your own key."
+        },
+        "psk": {
+          "name": "Own key",
+          "description": "Base64 key of 16 or 32 bytes, used when the key is set to own key."
+        },
+        "position_precision": {
+          "name": "Position precision",
+          "description": "0 = never share position on this channel, 32 = precise, 13 = about 2.9 km."
+        },
+        "uplink": {
+          "name": "MQTT uplink",
+          "description": "Forward this channel to MQTT."
+        },
+        "downlink": {
+          "name": "MQTT downlink",
+          "description": "Receive this channel from MQTT."
+        },
+        "muted": {
+          "name": "Muted",
+          "description": "Do not notify on the radio for this channel."
+        }
+      }
+    },
+    "delete_channel": {
+      "name": "Delete channel",
+      "description": "Deletes a secondary channel by name or index. Later channels move up one slot.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio to configure (required when more than one is configured)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name of the channel to delete."
+        },
+        "index": {
+          "name": "Index",
+          "description": "Slot 1-7 of the channel to delete (alternative to the name)."
+        }
+      }
+    },
+    "join_channel": {
+      "name": "Join channel from link",
+      "description": "Adds the channels from a Meshtastic share link. With replace, all channels and the LoRa settings are replaced and the radio reboots.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Radio",
+          "description": "Radio to configure (required when more than one is configured)."
+        },
+        "url": {
+          "name": "Link",
+          "description": "Channel link such as https://meshtastic.org/e/#..."
+        },
+        "replace": {
+          "name": "Replace everything",
+          "description": "Replace all channels and the LoRa settings (radio reboots) instead of adding."
         }
       }
     }
@@ -146,6 +232,12 @@
     },
     "entry_required": {
       "message": "Several radios are configured; choose one."
+    },
+    "invalid_channel": {
+      "message": "Channel change rejected: {error}"
+    },
+    "channel_not_found": {
+      "message": "No channel named {name}."
     }
   }
 }

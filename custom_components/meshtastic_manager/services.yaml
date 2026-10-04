@@ -15,9 +15,89 @@ send_text:
       selector:
         text:
     channel:
-      default: 0
       selector:
         number:
           min: 0
           max: 7
           mode: box
+    channel_name:
+      example: "Dom"
+      selector:
+        text:
+
+add_channel:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: meshtastic_manager
+    name:
+      required: true
+      example: "Dom"
+      selector:
+        text:
+    key:
+      default: random
+      selector:
+        select:
+          translation_key: channel_key
+          options:
+            - random
+            - default
+            - none
+            - custom
+    psk:
+      selector:
+        text:
+    position_precision:
+      default: 13
+      selector:
+        number:
+          min: 0
+          max: 32
+          mode: box
+    uplink:
+      default: false
+      selector:
+        boolean:
+    downlink:
+      default: false
+      selector:
+        boolean:
+    muted:
+      default: false
+      selector:
+        boolean:
+
+delete_channel:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: meshtastic_manager
+    name:
+      example: "Dom"
+      selector:
+        text:
+    index:
+      selector:
+        number:
+          min: 1
+          max: 7
+          mode: box
+
+join_channel:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: meshtastic_manager
+    url:
+      required: true
+      example: "https://meshtastic.org/e/#..."
+      selector:
+        text:
+    replace:
+      default: false
+      selector:
+        boolean:

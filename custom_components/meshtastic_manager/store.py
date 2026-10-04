@@ -57,16 +57,17 @@ class MeshStore:
         self._store.async_delay_save(self._data, STORAGE_SAVE_DELAY)
 
     @callback
-    def add_message(self, message: dict[str, Any]) -> None:
-        """Append a message (deduplicating radio retransmissions)."""
+    def add_message(self, message: dict[str, Any]) -> bool:
+        """Append a message; False if it is a retransmission already stored."""
         if message.get("dir") == "in" and message.get("id"):
             for existing in reversed(self.messages[-200:]):
                 if existing.get("id") == message["id"] and existing.get("from") == message["from"]:
-                    return
+                    return False
         self.messages.append(message)
         if len(self.messages) > MAX_MESSAGES:
             del self.messages[: len(self.messages) - MAX_MESSAGES]
         self._schedule_save()
+        return True
 
     @callback
     def find_outgoing(self, packet_id: int) -> dict[str, Any] | None:

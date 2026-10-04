@@ -347,25 +347,58 @@ class MeshtasticClient:
             "via_mqtt": bool(packet.get("viaMqtt")),
             "reply_id": decoded.get("replyId"),
             "emoji": bool(decoded.get("emoji")),
+            # Direct messages encrypted with the sender's key (firmware 2.5+)
+            # are the only ones whose sender is authenticated.
+            "pki": bool(packet.get("pkiEncrypted")),
         }
         message["conversation"] = self.conversation_key(message)
-        self.store.add_message(message)
+        if not self.store.add_message(message):
+            return  # retransmission of a message we already handled
         self._emit({"type": "message", "message": message})
+        self.hass.bus.async_fire(EVENT_MESSAGE, self.message_event_data(message))
+        async_dispatcher_send(self.hass, SIGNAL_UPDATE.format(self.entry.entry_id))
+
+    def channel_name(self, index: int) -> str:
+        """Display name of a channel slot (primary without a name = modem preset)."""
+        iface = self.iface
+        channels = iface.localNode.channels if iface is not None else None
+        if channels and 0 <= index < len(channels):
+            name = channels[index].settings.name
+            if name:
+                return name
+            if index == 0:
+                from meshtastic.protobuf import config_pb2  # noqa: PLC0415
+
+                preset = config_pb2.Config.LoRaConfig.ModemPreset.Name(
+                    iface.localNode.localConfig.lora.modem_preset
+                )
+                return "".join(part.capitalize() for part in preset.split("_"))
+        return f"Channel {index}"
+
+    def message_event_data(self, message: dict[str, Any]) -> dict[str, Any]:
+        """Data of the meshtastic_manager_message event / message event entity."""
         sender = self.node(message["from"]) or {}
         user = sender.get("user") or {}
-        self.hass.bus.async_fire(
-            EVENT_MESSAGE,
-            {
-                "entry_id": self.entry.entry_id,
-                "from": node_id(message["from"]),
-                "from_name": user.get("longName"),
-                "to": "broadcast" if to == BROADCAST_NUM else node_id(to),
-                "channel": message["channel"],
-                "text": message["text"],
-                "direct": to != BROADCAST_NUM,
-            },
-        )
-        async_dispatcher_send(self.hass, SIGNAL_UPDATE.format(self.entry.entry_id))
+        direct = message["to"] != BROADCAST_NUM
+        return {
+            "entry_id": self.entry.entry_id,
+            "message_id": message["id"],
+            "text": message["text"],
+            "from": node_id(message["from"]),
+            "from_num": message["from"],
+            "from_name": user.get("longName"),
+            "from_short_name": user.get("shortName"),
+            "to": node_id(message["to"]) if direct else "broadcast",
+            "direct": direct,
+            "channel": message["channel"],
+            # Name of the channel for broadcasts; None for direct messages.
+            "channel_name": None if direct else self.channel_name(message["channel"]),
+            "pki": message.get("pki", False),
+            "hops": message.get("hops"),
+            "snr": message.get("snr"),
+            "rssi": message.get("rssi"),
+            "via_mqtt": message.get("via_mqtt", False),
+        }
 
     @callback
     def _handle_routing(self, packet: dict, decoded: dict) -> None:
