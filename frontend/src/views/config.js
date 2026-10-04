@@ -1,9 +1,8 @@
 import { LitElement, html, css } from "lit";
 import { shared } from "../styles.js";
-import { channelName, position, randomKey } from "../util.js";
+import { position } from "../util.js";
 import "./proto-form.js";
-
-const CHANNEL_ROLES = ["DISABLED", "PRIMARY", "SECONDARY"];
+import "./channels.js";
 
 class MmConfig extends LitElement {
   static properties = {
@@ -66,7 +65,7 @@ class MmConfig extends LitElement {
         is_unmessagable: !!o.isUnmessagable,
       };
     } else if (section === "channels") {
-      this._draft = structuredClone(cfg.channels);
+      this._draft = {};
     } else if (section === "fixed") {
       const pos = position(this.panel.myNode);
       this._draft = { latitude: pos?.lat ?? "", longitude: pos?.lon ?? "", altitude: pos?.alt ?? 0 };
@@ -116,16 +115,6 @@ class MmConfig extends LitElement {
     const [kind, name] = s.split(":");
     await this._run(() => p.ws("config_set", { sections: [{ kind, section: name, values: this._draft }] }));
     this._cfg.values[kind][name] = structuredClone(this._draft);
-  }
-
-  async _saveChannel(index) {
-    const p = this.panel;
-    const ch = this._draft[index];
-    await this._run(() => p.ws("channel_set", { index, role: ch.role, settings: ch.settings || {} }));
-    this._cfg.channels[index] = structuredClone(ch);
-    // Channel names and roles are shown on other tabs too.
-    p.data.channels = structuredClone(this._draft);
-    p.bump();
   }
 
   render() {
@@ -202,53 +191,12 @@ class MmConfig extends LitElement {
 
   _renderChannels() {
     const p = this.panel;
-    const t = p.t;
-    const lora = this._cfg.values.config.lora;
-    return html`
-      ${this._cfg.url
-        ? html`<div class="card url">
-            <h2>${t("share_url")}</h2>
-            <input readonly .value=${this._cfg.url} @focus=${(e) => e.target.select()} />
-          </div>`
-        : ""}
-      ${this._draft.map((ch, i) => {
-        const role = ch.role || "DISABLED";
-        const update = (changes) => {
-          const draft = structuredClone(this._draft);
-          draft[i] = { ...draft[i], ...changes };
-          this._change(draft);
-        };
-        const setPsk = (psk) => update({ settings: { ...(ch.settings || {}), psk } });
-        const changed = JSON.stringify(ch) !== JSON.stringify(this._cfg.channels[i]);
-        return html`<div class="card channel">
-          <div class="row head">
-            <h2 class="grow">#${i} ${role !== "DISABLED" ? channelName(ch, lora, t) : ""}</h2>
-            <select .value=${role} @change=${(e) => update({ role: e.target.value })}>
-              ${CHANNEL_ROLES.map(
-                (r) => html`<option value=${r} ?selected=${r === role} ?disabled=${(r === "PRIMARY") !== (i === 0)}>
-                  ${t(r.toLowerCase())}
-                </option>`
-              )}
-            </select>
-            <button class="btn primary" ?disabled=${!changed || this._saving || !p.data.status.connected} @click=${() => this._saveChannel(i)}>
-              <ha-icon icon="mdi:content-save"></ha-icon>${t("save")}
-            </button>
-          </div>
-          ${role !== "DISABLED"
-            ? html`<div class="row psk">
-                  <button class="btn" @click=${() => setPsk(randomKey())}><ha-icon icon="mdi:key-plus"></ha-icon>${t("generate_key")}</button>
-                  <button class="btn" @click=${() => setPsk("AQ==")}><ha-icon icon="mdi:key"></ha-icon>${t("default_key")}</button>
-                  <button class="btn" @click=${() => setPsk("")}><ha-icon icon="mdi:key-remove"></ha-icon>${t("no_key")}</button>
-                </div>
-                <mm-proto-form
-                  .schema=${this._cfg.schema.channel}
-                  .value=${ch.settings || {}}
-                  @value-changed=${(e) => update({ settings: e.detail.value })}
-                ></mm-proto-form>`
-            : ""}
-        </div>`;
-      })}
-    `;
+    return html`<mm-channels
+      .panel=${p}
+      .rev=${this.rev}
+      .channels=${p.data.channels}
+      .lora=${p.data.lora}
+    ></mm-channels>`;
   }
 
   _renderFixed() {

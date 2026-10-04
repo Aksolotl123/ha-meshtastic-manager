@@ -25,8 +25,11 @@ for automations.
   as favourite or ignored, or remove it.
 - **Map**: nodes coloured by how recently they were heard, plus traceroute paths. Tiles come
   through Home Assistant's own OpenStreetMap proxy.
-- **Settings** (admins only): owner names, the 8 channel slots (role, name, PSK
-  random/default/none, uplink/downlink, position precision), a fixed position, and **every config and
+- **Channels** (admins only): create a channel (name, random/default/own key or none, position
+  precision, MQTT up/downlink, mute), join channels from a Meshtastic share link (add to yours, or
+  replace all channels and the LoRa settings, which reboots the radio), edit, delete (later channels
+  move up), and share one or all channels as a link with a QR code for the phone app.
+- **Settings** (admins only): owner names, a fixed position, and **every config and
   module section** of the firmware. Forms are generated from the Meshtastic protobuf definitions,
   so new firmware options appear automatically.
 

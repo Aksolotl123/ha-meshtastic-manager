@@ -191,6 +191,7 @@ class MeshtasticManagerPanel extends LitElement {
         break;
       }
       case "snapshot":
+      case "channels":
         this.reload();
         return;
       case "node":

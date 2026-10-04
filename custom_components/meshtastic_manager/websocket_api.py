@@ -66,6 +66,10 @@ def async_register(hass: HomeAssistant) -> None:
         ws_config_get,
         ws_config_set,
         ws_channel_set,
+        ws_channel_add,
+        ws_channel_delete,
+        ws_channel_import,
+        ws_channel_url,
         ws_owner_set,
         ws_device_action,
         ws_fixed_position,
@@ -248,7 +252,6 @@ async def ws_config_get(hass, connection, msg, client: MeshtasticClient) -> None
             "values": protoutil.config_values(iface),
             "channels": [protoutil.to_dict(c) for c in (iface.localNode.channels or [])],
             "owner": local.get("user", {}),
-            "url": await hass.async_add_executor_job(protoutil.channel_url, iface),
         },
     )
 
@@ -295,14 +298,111 @@ async def ws_config_set(hass, connection, msg, client: MeshtasticClient) -> None
 @websocket_api.async_response
 @_with_client
 async def ws_channel_set(hass, connection, msg, client: MeshtasticClient) -> None:
-    """Write one channel."""
+    """Edit one existing channel (disabling a secondary deletes it)."""
     from . import protoutil  # noqa: PLC0415
 
     iface = client._require_iface()  # noqa: SLF001
-    await client.async_run(
-        protoutil.write_channel, iface, msg["index"], msg["role"], msg["settings"]
-    )
+    index, role = msg["index"], msg["role"]
+    if (index == 0) != (role == "PRIMARY") and role != "DISABLED":
+        raise ValueError("Only channel 0 can be the primary channel")
+    channels = list(iface.localNode.channels or [])
+    if role == "DISABLED":
+        writes = protoutil.plan_delete(channels, index)
+    else:
+        settings = protoutil.channel_settings_from_dict(
+            msg["settings"], require_name=role == "SECONDARY"
+        )
+        writes = [protoutil.channel_pb2.Channel(index=index, role=protoutil.ROLE.Value(role))]
+        writes[0].settings.CopyFrom(settings)
+    await client.async_run(protoutil.write_channels, iface, writes)
+    client.async_channels_changed()
     connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}/channel_add",
+        vol.Required("entry_id"): str,
+        vol.Required("settings"): dict,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+@_with_client
+async def ws_channel_add(hass, connection, msg, client: MeshtasticClient) -> None:
+    """Create a secondary channel in the first free slot."""
+    from . import protoutil  # noqa: PLC0415
+
+    iface = client._require_iface()  # noqa: SLF001
+    settings = protoutil.channel_settings_from_dict(msg["settings"], require_name=True)
+    new = protoutil.plan_add(list(iface.localNode.channels or []), settings)
+    await client.async_run(protoutil.write_channels, iface, [new])
+    client.async_channels_changed()
+    connection.send_result(msg["id"], {"index": new.index})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}/channel_delete",
+        vol.Required("entry_id"): str,
+        vol.Required("index"): vol.All(int, vol.Range(min=1, max=7)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+@_with_client
+async def ws_channel_delete(hass, connection, msg, client: MeshtasticClient) -> None:
+    """Delete a secondary channel; later channels move down one slot."""
+    from . import protoutil  # noqa: PLC0415
+
+    iface = client._require_iface()  # noqa: SLF001
+    writes = protoutil.plan_delete(list(iface.localNode.channels or []), msg["index"])
+    await client.async_run(protoutil.write_channels, iface, writes)
+    client.async_channels_changed()
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}/channel_import",
+        vol.Required("entry_id"): str,
+        vol.Required("url"): str,
+        vol.Optional("replace", default=False): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+@_with_client
+async def ws_channel_import(hass, connection, msg, client: MeshtasticClient) -> None:
+    """Join channels from a share link (replace mode also applies its LoRa settings)."""
+    from . import protoutil  # noqa: PLC0415
+
+    iface = client._require_iface()  # noqa: SLF001
+    result = await client.async_run(
+        protoutil.import_channels, iface, msg["url"], msg["replace"]
+    )
+    client.async_channels_changed()
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}/channel_url",
+        vol.Required("entry_id"): str,
+        vol.Optional("index"): vol.All(int, vol.Range(min=0, max=7)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+@_with_client
+async def ws_channel_url(hass, connection, msg, client: MeshtasticClient) -> None:
+    """Share link for one channel, or for all channels when no index is given."""
+    from . import protoutil  # noqa: PLC0415
+
+    iface = client._require_iface()  # noqa: SLF001
+    connection.send_result(
+        msg["id"], {"url": protoutil.channel_share_url(iface, msg.get("index"))}
+    )
 
 
 @websocket_api.websocket_command(

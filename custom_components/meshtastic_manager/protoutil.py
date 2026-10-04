@@ -7,13 +7,20 @@ added by future firmware) is editable without hand-written forms.
 
 from __future__ import annotations
 
+import base64
 import copy
 from typing import Any
 
 from google.protobuf import json_format
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 from google.protobuf.message import Message
-from meshtastic.protobuf import admin_pb2, channel_pb2, localonly_pb2, mesh_pb2
+from meshtastic.protobuf import (
+    admin_pb2,
+    apponly_pb2,
+    channel_pb2,
+    localonly_pb2,
+    mesh_pb2,
+)
 
 # Sections we never show in the generic editor.
 SKIP_SECTIONS = {"version", "sessionkey", "device_ui"}
@@ -157,19 +164,191 @@ def write_sections(iface: Any, sections: list[tuple[str, str, Message]]) -> None
     node.commitSettingsTransaction()
 
 
-def write_channel(iface: Any, index: int, role: str, settings: dict[str, Any]) -> None:
-    """Write one channel slot."""
+# ---------------------------------------------------------------- channels
+
+MAX_CHANNELS = 8
+CHANNEL_NAME_MAX_BYTES = 11  # firmware stores the name in char[12]
+VALID_PSK_LENGTHS = (0, 1, 16, 32)
+URL_BASE = "https://meshtastic.org/e/"
+ROLE = channel_pb2.Channel.Role
+
+
+def channel_settings_from_dict(
+    settings: dict[str, Any], *, require_name: bool
+) -> channel_pb2.ChannelSettings:
+    """Validate and convert panel input to ChannelSettings (raises ValueError)."""
+    result = channel_pb2.ChannelSettings()
+    try:
+        json_format.ParseDict(settings, result, ignore_unknown_fields=True)
+    except json_format.ParseError as err:
+        raise ValueError(str(err)) from err
+    validate_channel_settings(result, require_name=require_name)
+    return result
+
+
+def validate_channel_settings(
+    settings: channel_pb2.ChannelSettings, *, require_name: bool
+) -> None:
+    """Enforce the firmware limits on a channel."""
+    name_bytes = len(settings.name.encode())
+    if name_bytes > CHANNEL_NAME_MAX_BYTES:
+        raise ValueError(
+            f"Channel name is {name_bytes} bytes; the radio allows {CHANNEL_NAME_MAX_BYTES}"
+        )
+    if require_name and not settings.name.strip():
+        raise ValueError("Secondary channels need a name")
+    if len(settings.psk) not in VALID_PSK_LENGTHS:
+        raise ValueError(f"Key must be 0, 1, 16 or 32 bytes (got {len(settings.psk)})")
+
+
+def _same_channel(a: channel_pb2.ChannelSettings, b: channel_pb2.ChannelSettings) -> bool:
+    return a.name == b.name and a.psk == b.psk
+
+
+def plan_add(
+    channels: list[channel_pb2.Channel], settings: channel_pb2.ChannelSettings
+) -> channel_pb2.Channel:
+    """Return the channel to write for a new secondary channel (first free slot)."""
+    for ch in channels:
+        if ch.index != 0 and ch.role != ROLE.DISABLED and ch.settings.name == settings.name:
+            raise ValueError(f"A channel named '{settings.name}' already exists")
+    for ch in channels:
+        if ch.index != 0 and ch.role == ROLE.DISABLED:
+            new = channel_pb2.Channel(index=ch.index, role=ROLE.SECONDARY)
+            new.settings.CopyFrom(settings)
+            return new
+    raise ValueError("All 8 channel slots are in use")
+
+
+def plan_delete(channels: list[channel_pb2.Channel], index: int) -> list[channel_pb2.Channel]:
+    """Remove a secondary channel and shift the following ones down.
+
+    Returns only the slots whose content changed, in ascending order (the
+    order the library uses). Over a local serial link the admin channel index
+    does not matter; a remote/BLE admin path would have to track it.
+    """
+    by_index = {c.index: c for c in channels}
+    if index <= 0 or index not in by_index:
+        raise ValueError("The primary channel cannot be deleted")
+    if by_index[index].role != ROLE.SECONDARY:
+        raise ValueError("Only secondary channels can be deleted")
+    result: list[channel_pb2.Channel] = []
+    for slot in range(index, MAX_CHANNELS):
+        new = channel_pb2.Channel(index=slot, role=ROLE.DISABLED)
+        source = by_index.get(slot + 1)
+        if source is not None and source.role != ROLE.DISABLED:
+            new.role = source.role
+            new.settings.CopyFrom(source.settings)
+        old = by_index.get(slot)
+        if old is None or old.SerializeToString() != new.SerializeToString():
+            result.append(new)
+    return result
+
+
+def parse_channel_url(url: str) -> tuple[apponly_pb2.ChannelSet, bool]:
+    """Decode a https://meshtastic.org/e/#... share link. Returns (set, add_only)."""
+    url = url.strip()
+    if "#" not in url:
+        raise ValueError("Not a Meshtastic channel link (missing #...)")
+    head, b64 = url.split("#", 1)
+    add_only = "add=true" in head
+    b64 = b64.strip().replace("-", "+").replace("_", "/")
+    b64 += "=" * (-len(b64) % 4)
+    channel_set = apponly_pb2.ChannelSet()
+    try:
+        channel_set.ParseFromString(base64.b64decode(b64))
+    except Exception as err:
+        raise ValueError("The link could not be decoded") from err
+    if not channel_set.settings:
+        raise ValueError("The link contains no channels")
+    for settings in channel_set.settings:
+        validate_channel_settings(settings, require_name=False)
+    return channel_set, add_only
+
+
+def build_channel_url(
+    settings: list[channel_pb2.ChannelSettings], lora: Any | None, add_only: bool = False
+) -> str:
+    """Encode channels (and optionally the LoRa config) as a share link."""
+    channel_set = apponly_pb2.ChannelSet()
+    for item in settings:
+        channel_set.settings.append(item)
+    if lora is not None:
+        channel_set.lora_config.CopyFrom(lora)
+    b64 = base64.urlsafe_b64encode(channel_set.SerializeToString()).decode().rstrip("=")
+    return f"{URL_BASE}{'?add=true' if add_only else ''}#{b64}"
+
+
+def plan_import(
+    channels: list[channel_pb2.Channel], channel_set: apponly_pb2.ChannelSet, replace: bool
+) -> tuple[list[channel_pb2.Channel], list[str], list[str]]:
+    """Plan channel writes for a share link. Returns (writes, added, skipped)."""
+    added: list[str] = []
+    skipped: list[str] = []
+    writes: list[channel_pb2.Channel] = []
+    if replace:
+        if len(channel_set.settings) > MAX_CHANNELS:
+            raise ValueError("The link has more than 8 channels")
+        for slot in range(MAX_CHANNELS):
+            new = channel_pb2.Channel(index=slot, role=ROLE.DISABLED)
+            if slot < len(channel_set.settings):
+                new.role = ROLE.PRIMARY if slot == 0 else ROLE.SECONDARY
+                new.settings.CopyFrom(channel_set.settings[slot])
+                added.append(new.settings.name or "primary")
+            writes.append(new)
+        return writes, added, skipped
+    working = {c.index: c for c in channels}
+    for settings in channel_set.settings:
+        label = settings.name or "primary"
+        # Unnamed channels (the default primary) cannot be added as secondaries.
+        if not settings.name or any(
+            c.role != ROLE.DISABLED and _same_channel(c.settings, settings)
+            for c in working.values()
+        ):
+            skipped.append(label)
+            continue
+        new = plan_add(list(working.values()), settings)
+        working[new.index] = new
+        writes.append(new)
+        added.append(label)
+    return writes, added, skipped
+
+
+def write_channels(iface: Any, writes: list[channel_pb2.Channel]) -> None:
+    """Send planned channel writes and update the cached channel list."""
     node = iface.localNode
-    channel = channel_pb2.Channel()
-    channel.index = index
-    channel.role = channel_pb2.Channel.Role.Value(role)
-    if role != "DISABLED":
-        json_format.ParseDict(settings, channel.settings, ignore_unknown_fields=True)
-    admin = admin_pb2.AdminMessage()
-    admin.set_channel.CopyFrom(channel)
-    send_admin(iface, admin)
-    if node.channels is not None and index < len(node.channels):
-        node.channels[index].CopyFrom(channel)
+    for channel in writes:
+        admin = admin_pb2.AdminMessage()
+        admin.set_channel.CopyFrom(channel)
+        send_admin(iface, admin)
+        if node.channels is not None and channel.index < len(node.channels):
+            node.channels[channel.index].CopyFrom(channel)
+
+
+def import_channels(iface: Any, url: str, replace: bool) -> dict[str, Any]:
+    """Apply a share link. Replace mode also writes its LoRa config (radio reboots)."""
+    channel_set, _ = parse_channel_url(url)
+    writes, added, skipped = plan_import(
+        list(iface.localNode.channels or []), channel_set, replace
+    )
+    write_channels(iface, writes)
+    lora_changed = False
+    if replace and channel_set.HasField("lora_config"):
+        write_sections(iface, [(KIND_CONFIG, "lora", channel_set.lora_config)])
+        lora_changed = True
+    return {"added": added, "skipped": skipped, "lora_changed": lora_changed}
+
+
+def channel_share_url(iface: Any, index: int | None) -> str:
+    """Share link for one channel (add-only) or for all channels plus LoRa settings."""
+    node = iface.localNode
+    channels = [c for c in (node.channels or []) if c.role != ROLE.DISABLED]
+    if index is None:
+        return build_channel_url([c.settings for c in channels], node.localConfig.lora)
+    channel = next((c for c in channels if c.index == index), None)
+    if channel is None:
+        raise ValueError("No such channel")
+    return build_channel_url([channel.settings], node.localConfig.lora, add_only=index != 0)
 
 
 def write_owner(
@@ -242,11 +421,3 @@ def set_fixed_position(iface: Any, lat: float, lon: float, alt: int) -> None:
     admin = admin_pb2.AdminMessage()
     admin.set_fixed_position.CopyFrom(position)
     send_admin(iface, admin)
-
-
-def channel_url(iface: Any, include_all: bool = True) -> str | None:
-    """Return the shareable channel URL."""
-    try:
-        return iface.localNode.getURL(includeAll=include_all)
-    except Exception:  # noqa: BLE001
-        return None

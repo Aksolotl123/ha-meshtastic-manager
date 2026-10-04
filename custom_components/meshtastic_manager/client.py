@@ -573,6 +573,11 @@ class MeshtasticClient:
         me.short_name = local.get("shortName", "")
         return await self.async_send_data("NODEINFO_APP", me, to, channel)
 
+    @callback
+    def async_channels_changed(self) -> None:
+        """Tell panels to reload after channels were added, edited or removed."""
+        self._emit({"type": "channels"})
+
     async def async_run(self, func: Callable[..., Any], *args: Any) -> Any:
         """Run a blocking call against the interface in the executor."""
         self._require_iface()

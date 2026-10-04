@@ -77,7 +77,11 @@ def test_unknown_section_rejected():
 
 def test_channel_and_actions():
     iface = make_iface()
-    protoutil.write_channel(iface, 1, "SECONDARY", {"name": "test", "psk": "AQ=="})
+    channel = channel_pb2.Channel(index=1, role=channel_pb2.Channel.Role.SECONDARY)
+    channel.settings.CopyFrom(
+        protoutil.channel_settings_from_dict({"name": "test", "psk": "AQ=="}, require_name=True)
+    )
+    protoutil.write_channels(iface, [channel])
     msg = iface.localNode.sent[-1]
     assert msg.set_channel.settings.name == "test" and msg.set_channel.settings.psk == b"\x01"
     iface.nodesByNum[42] = {"num": 42}
