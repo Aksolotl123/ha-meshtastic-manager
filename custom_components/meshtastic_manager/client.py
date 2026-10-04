@@ -17,9 +17,11 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.start import async_at_started
 
 from .const import (
     BROADCAST_NUM,
@@ -116,6 +118,11 @@ class MeshtasticClient:
         """Start the background connect/reconnect loop."""
         self._pub = await self.hass.async_add_import_executor_job(_import_pubsub)
         self._subscribe()
+        # Config entries are not unloaded when Home Assistant stops; close the
+        # radio anyway so the library's threads do not outlive the event loop.
+        self.entry.async_on_unload(
+            self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._async_on_hass_stop)
+        )
         self._task = self.entry.async_create_background_task(
             self.hass, self._run(), f"meshtastic_manager connection {self.entry.entry_id}"
         )
@@ -131,11 +138,27 @@ class MeshtasticClient:
         self._unsubscribe()
         await self._async_close_iface()
 
+    async def _async_on_hass_stop(self, _event: Event) -> None:
+        await self.async_stop()
+
+    def _to_loop(self, func: Callable[..., Any], *args: Any) -> None:
+        """Schedule a callback on the HA loop from a library thread."""
+        try:
+            self.hass.loop.call_soon_threadsafe(func, *args)
+        except RuntimeError:
+            # The event loop is already closed (Home Assistant shutting down).
+            pass
+
     async def async_reconnect(self) -> None:
         """Force a reconnect (e.g. after a reboot command)."""
         self._lost.set()
 
     async def _run(self) -> None:
+        # Downloading a large node database over serial while Home Assistant is
+        # still starting up (CPU busy) overflows the tty buffer and loses bytes.
+        started = asyncio.Event()
+        self.entry.async_on_unload(async_at_started(self.hass, callback(lambda _hass: started.set())))
+        await started.wait()
         delay = RECONNECT_MIN
         while not self._stopping:
             self._lost.clear()
@@ -224,20 +247,20 @@ class MeshtasticClient:
     # These run on the library's publishing thread.
     def _on_receive(self, packet: dict, interface: Any = None) -> None:
         if interface is not None and interface is self.iface:
-            self.hass.loop.call_soon_threadsafe(self._handle_packet, interface, packet)
+            self._to_loop(self._handle_packet, interface, packet)
 
     def _on_established(self, interface: Any = None) -> None:
         """Connection (re)established; handled by the connect loop."""
 
     def _on_lost(self, interface: Any = None) -> None:
         if interface is not None and interface is self.iface:
-            self.hass.loop.call_soon_threadsafe(self._lost.set)
+            self._to_loop(self._lost.set)
 
     def _on_node(self, node: dict, interface: Any = None) -> None:
         if interface is not None and interface is self.iface and self.connected:
             num = node.get("num")
             if num is not None:
-                self.hass.loop.call_soon_threadsafe(self._emit_node, num)
+                self._to_loop(self._emit_node, num)
 
     # ------------------------------------------------------------------ events
 
@@ -601,9 +624,9 @@ def _create_iface(data: dict[str, Any]) -> Any:
             connectNow=False,
             timeout=CONNECT_TIMEOUT,
         )
-    from meshtastic.serial_interface import SerialInterface  # noqa: PLC0415
+    from .serialio import buffered_serial_class  # noqa: PLC0415
 
-    return SerialInterface(data[CONF_DEVICE], connectNow=False, timeout=CONNECT_TIMEOUT)
+    return buffered_serial_class()(data[CONF_DEVICE], connectNow=False, timeout=CONNECT_TIMEOUT)
 
 
 def _connect_iface(iface: Any) -> None:
