@@ -37,8 +37,57 @@ for automations.
 uptime, nodes online/known, messages today, packet counters (disabled by default), and a
 `Message` event entity (`direct_message` / `channel_message`).
 
-**Action** `meshtastic_manager.send_text` (text, optional `to` node id like `!a1b2c3d4`,
-`channel` 0–7). Every received text also fires the `meshtastic_manager_message` event.
+## Automations
+
+**Actions**
+
+| Action | What it does |
+|---|---|
+| `meshtastic_manager.send_text` | Send a message: `text`, optional `to` (node id like `!a1b2c3d4`, empty = broadcast), `channel` (0–7) or `channel_name` |
+| `meshtastic_manager.add_channel` | Create a secondary channel (`name`, `key`: random/default/none/custom, `position_precision`, MQTT up/downlink, `muted`). Returns the slot index, never the key |
+| `meshtastic_manager.delete_channel` | Delete a channel by `name` or `index` (later channels move up) |
+| `meshtastic_manager.join_channel` | Add channels from a share `url`; `replace: true` replaces all channels and the LoRa settings (radio reboots) |
+
+Channel actions require an administrator, or run from an automation.
+
+**Message event**: every new incoming text fires `meshtastic_manager_message`, and the
+`Message` event entity changes as well. The event data contains `text`, `from` (`!a1b2c3d4`),
+`from_num`, `from_name`, `from_short_name`, `direct`, `channel`, `channel_name`, `pki`
+(true for direct messages encrypted with the sender's key, firmware 2.5+), `hops`, `snr`,
+`rssi`, `via_mqtt`, `message_id`, `entry_id`. Retransmissions of the same packet do not fire
+the event again.
+
+**Blueprints**: control a lock from your Meshtastic radio.
+
+- **Unlock with a one-time code**
+  ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_unlock_with_code.yaml)):
+  you send `otwórz` / `open`, Home Assistant answers with a random 6-digit code, and the lock
+  opens only if you send that code back within the time limit. A recorded or replayed message
+  cannot open the door because the code changes every time. Optionally the lock is locked again
+  after N minutes, and every attempt, successful or not, triggers your notification action.
+- **Lock with a message**
+  ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_with_message.yaml)):
+  `zamknij` / `lock` locks immediately.
+
+Security notes: only the configured sender node is accepted. With a channel name, commands must
+arrive on that private channel. Anyone who knows the channel key can read the code there, so
+keep the key private. With the channel name left empty, only PKI-encrypted direct messages are
+accepted, which also authenticate the sender (recommended).
+
+Example notification on any direct message:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: meshtastic_manager_message
+    event_data:
+      direct: true
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      title: "Meshtastic: {{ trigger.event.data.from_name }}"
+      message: "{{ trigger.event.data.text }}"
+```
 
 ## Installation
 
@@ -63,21 +112,6 @@ Copy `custom_components/meshtastic_manager` into your `config/custom_components/
 Connecting can take up to a minute while the radio sends its node database. If the radio goes
 away, Home Assistant reconnects automatically with backoff.
 
-## Automation example
-
-```yaml
-triggers:
-  - trigger: state
-    entity_id: event.home_gateway_message
-    attribute: event_type
-    to: direct_message
-actions:
-  - action: notify.mobile_app_phone
-    data:
-      title: "Meshtastic: {{ trigger.to_state.attributes.from_name }}"
-      message: "{{ trigger.to_state.attributes.text }}"
-```
-
 ## Development
 
 - Backend: `custom_components/meshtastic_manager`. It uses the official
@@ -87,7 +121,8 @@ actions:
   `custom_components/meshtastic_manager/frontend/`: `cd frontend && npm install && npm run build`.
 - `tests/fake_radio.py` is a simulated radio speaking the Meshtastic TCP stream protocol, for UI
   work without hardware (`python tests/fake_radio.py`, then add the integration as TCP
-  `127.0.0.1:4403`).
+  `127.0.0.1:4403`). Send `<from hex>|<channel or dm>|<text>` as a UDP datagram to port 4404
+  to inject a message, e.g. `printf '10000000|1|open' | nc -u -w1 127.0.0.1 4404`.
 - Tests: `pip install meshtastic pytest && pytest tests`.
 
 ## License
