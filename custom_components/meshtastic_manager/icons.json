@@ -1,0 +1,21 @@
+{
+  "entity": {
+    "event": {
+      "message": { "default": "mdi:message-text" }
+    },
+    "sensor": {
+      "channel_utilization": { "default": "mdi:signal" },
+      "air_util_tx": { "default": "mdi:access-point" },
+      "nodes_online": { "default": "mdi:account-multiple-check" },
+      "nodes_total": { "default": "mdi:account-multiple" },
+      "messages_today": { "default": "mdi:message-badge" },
+      "packets_tx": { "default": "mdi:upload" },
+      "packets_rx": { "default": "mdi:download" },
+      "packets_rx_bad": { "default": "mdi:alert-circle-outline" },
+      "packets_relayed": { "default": "mdi:swap-horizontal" }
+    }
+  },
+  "services": {
+    "send_text": { "service": "mdi:send" }
+  }
+}

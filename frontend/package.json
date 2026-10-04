@@ -1,0 +1,17 @@
+{
+  "name": "meshtastic-manager-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/panel.js --bundle --format=esm --minify --target=es2022 --loader:.css=text --outfile=../custom_components/meshtastic_manager/frontend/meshtastic-manager-panel.js",
+    "watch": "npm run build -- --watch"
+  },
+  "dependencies": {
+    "leaflet": "1.9",
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

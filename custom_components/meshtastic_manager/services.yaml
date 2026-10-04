@@ -1,0 +1,23 @@
+send_text:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: meshtastic_manager
+    text:
+      required: true
+      example: "Hello mesh"
+      selector:
+        text:
+          multiline: true
+    to:
+      example: "!a1b2c3d4"
+      selector:
+        text:
+    channel:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 7
+          mode: box

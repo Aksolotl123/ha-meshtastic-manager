@@ -1,0 +1,15 @@
+{
+  "domain": "meshtastic_manager",
+  "name": "Meshtastic Manager",
+  "after_dependencies": ["hassio"],
+  "codeowners": ["@Aksolotl123"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom", "usb", "websocket_api"],
+  "documentation": "https://github.com/Aksolotl123/ha-meshtastic-manager",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Aksolotl123/ha-meshtastic-manager/issues",
+  "loggers": ["meshtastic"],
+  "requirements": ["meshtastic==2.7.11"],
+  "version": "0.1.0"
+}

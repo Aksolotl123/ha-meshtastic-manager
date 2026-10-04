@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect a Meshtastic radio",
+        "menu_options": {
+          "serial": "USB / serial",
+          "tcp": "Network (TCP)"
+        }
+      },
+      "serial": {
+        "title": "Serial port",
+        "description": "Select the port your Meshtastic radio is connected to. Connecting can take up to a minute while the radio sends its node database.",
+        "data": { "device": "Port" }
+      },
+      "serial_manual": {
+        "title": "Serial port path",
+        "data": { "device": "Device path" },
+        "data_description": { "device": "Prefer a stable /dev/serial/by-id/… path." }
+      },
+      "tcp": {
+        "title": "Network radio",
+        "data": { "host": "Host", "port": "Port" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the radio. Check the port and that no other program uses it.",
+      "timeout": "The radio did not finish sending its configuration in time."
+    },
+    "abort": {
+      "already_configured": "This radio is already configured."
+    }
+  },
+  "selector": {
+    "serial_port": {
+      "options": {
+        "__manual__": "Enter path manually"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": { "name": "Connected" }
+    },
+    "event": {
+      "message": {
+        "name": "Message",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "direct_message": "Direct message",
+              "channel_message": "Channel message"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "battery": { "name": "Battery" },
+      "voltage": { "name": "Voltage" },
+      "channel_utilization": { "name": "Channel utilization" },
+      "air_util_tx": { "name": "Airtime (TX)" },
+      "uptime": { "name": "Uptime" },
+      "nodes_online": { "name": "Nodes online" },
+      "nodes_total": { "name": "Nodes known" },
+      "messages_today": { "name": "Messages today" },
+      "packets_tx": { "name": "Packets sent" },
+      "packets_rx": { "name": "Packets received" },
+      "packets_rx_bad": { "name": "Bad packets received" },
+      "packets_relayed": { "name": "Packets relayed" }
+    }
+  },
+  "services": {
+    "send_text": {
+      "name": "Send text message",
+      "description": "Sends a text message over the mesh.",
+      "fields": {
+        "config_entry_id": { "name": "Radio", "description": "Radio to send from (required when more than one is configured)." },
+        "text": { "name": "Text", "description": "Message text (max 200 bytes)." },
+        "to": { "name": "To", "description": "Node id like !a1b2c3d4. Leave empty to broadcast on the channel." },
+        "channel": { "name": "Channel", "description": "Channel index 0-7." }
+      }
+    }
+  },
+  "exceptions": {
+    "text_too_long": { "message": "The message is longer than 200 bytes." },
+    "invalid_node": { "message": "Invalid node id." },
+    "not_connected": { "message": "The radio is not connected." },
+    "no_entry": { "message": "No Meshtastic radio is configured." },
+    "entry_required": { "message": "Several radios are configured; choose one." }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Połącz radio Meshtastic",
+        "menu_options": {
+          "serial": "USB / port szeregowy",
+          "tcp": "Sieć (TCP)"
+        }
+      },
+      "serial": {
+        "title": "Port szeregowy",
+        "description": "Wybierz port, do którego podłączone jest radio Meshtastic. Łączenie może potrwać do minuty, bo radio przesyła swoją bazę węzłów.",
+        "data": { "device": "Port" }
+      },
+      "serial_manual": {
+        "title": "Ścieżka portu szeregowego",
+        "data": { "device": "Ścieżka urządzenia" },
+        "data_description": { "device": "Najlepiej stała ścieżka /dev/serial/by-id/…" }
+      },
+      "tcp": {
+        "title": "Radio sieciowe",
+        "data": { "host": "Host", "port": "Port" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie udało się połączyć z radiem. Sprawdź port i czy żaden inny program go nie używa.",
+      "timeout": "Radio nie przesłało konfiguracji w wyznaczonym czasie."
+    },
+    "abort": {
+      "already_configured": "To radio jest już skonfigurowane."
+    }
+  },
+  "selector": {
+    "serial_port": {
+      "options": {
+        "__manual__": "Wpisz ścieżkę ręcznie"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": { "name": "Połączenie" }
+    },
+    "event": {
+      "message": {
+        "name": "Wiadomość",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "direct_message": "Wiadomość prywatna",
+              "channel_message": "Wiadomość na kanale"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "battery": { "name": "Bateria" },
+      "voltage": { "name": "Napięcie" },
+      "channel_utilization": { "name": "Wykorzystanie kanału" },
+      "air_util_tx": { "name": "Czas nadawania (TX)" },
+      "uptime": { "name": "Czas pracy" },
+      "nodes_online": { "name": "Węzły online" },
+      "nodes_total": { "name": "Znane węzły" },
+      "messages_today": { "name": "Wiadomości dzisiaj" },
+      "packets_tx": { "name": "Pakiety wysłane" },
+      "packets_rx": { "name": "Pakiety odebrane" },
+      "packets_rx_bad": { "name": "Błędne pakiety" },
+      "packets_relayed": { "name": "Pakiety przekazane" }
+    }
+  },
+  "services": {
+    "send_text": {
+      "name": "Wyślij wiadomość",
+      "description": "Wysyła wiadomość tekstową przez sieć mesh.",
+      "fields": {
+        "config_entry_id": { "name": "Radio", "description": "Radio, z którego wysłać (wymagane, gdy jest ich kilka)." },
+        "text": { "name": "Treść", "description": "Treść wiadomości (maks. 200 bajtów)." },
+        "to": { "name": "Do", "description": "Id węzła, np. !a1b2c3d4. Puste = wiadomość na kanał." },
+        "channel": { "name": "Kanał", "description": "Numer kanału 0-7." }
+      }
+    }
+  },
+  "exceptions": {
+    "text_too_long": { "message": "Wiadomość jest dłuższa niż 200 bajtów." },
+    "invalid_node": { "message": "Nieprawidłowe id węzła." },
+    "not_connected": { "message": "Radio nie jest połączone." },
+    "no_entry": { "message": "Nie skonfigurowano żadnego radia Meshtastic." },
+    "entry_required": { "message": "Skonfigurowano kilka radiów — wybierz jedno." }
+  }
+}
