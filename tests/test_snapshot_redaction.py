@@ -86,3 +86,23 @@ def test_invalid_base64_is_redacted():
     data = {"channels": [{"index": 1, "settings": {"psk": "not base64!"}}]}
     redacted = protoutil.snapshot_for_user(data, is_admin=False)
     assert redacted["channels"][0]["settings"]["psk"] == protoutil.REDACTED_PSK
+
+
+def test_non_admin_gets_no_conversations():
+    snap = make_snapshot()
+    snap["conversations"] = [{"key": "ch:0", "count": 1, "unread": 0, "last": {"text": "tajne"}}]
+    redacted = protoutil.snapshot_for_user(copy.deepcopy(snap), is_admin=False)
+    assert redacted["conversations"] == []
+    assert "tajne" not in json.dumps(redacted)
+    assert protoutil.snapshot_for_user(copy.deepcopy(snap), is_admin=True)["conversations"] == snap["conversations"]
+
+
+def test_message_events_only_for_admins():
+    message = {"type": "message", "message": {"text": "tajne"}}
+    status = {"type": "message_status", "id": 1, "status": "acked"}
+    node = {"type": "node", "node": {"num": 1}}
+    for event in (message, status):
+        assert protoutil.event_visible(event, is_admin=True)
+        assert not protoutil.event_visible(event, is_admin=False)
+    assert protoutil.event_visible(node, is_admin=False)
+    assert protoutil.event_visible({"type": "status"}, is_admin=False)

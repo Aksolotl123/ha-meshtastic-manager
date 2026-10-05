@@ -58,6 +58,7 @@ class MmMessages extends LitElement {
 
   updated() {
     const p = this.panel;
+    if (!p.isAdmin) return; // reading messages is admin-only
     const key = p.openConversation;
     if (key && !p.messages.has(key) && this._loadingKey !== key) {
       this._loadingKey = key;
@@ -93,6 +94,7 @@ class MmMessages extends LitElement {
   render() {
     const p = this.panel;
     const t = p.t;
+    if (!p.isAdmin) return html`<div class="card">${t("admin_only")}</div>`;
     const items = this._conversations;
     const open = p.openConversation;
     const narrow = p.narrow || window.innerWidth < 700;

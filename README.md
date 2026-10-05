@@ -16,7 +16,7 @@ for automations.
 - **Radio**: owner, hardware, firmware, region and preset, battery, voltage, channel utilisation,
   airtime, packet counters, channels. Admins can reconnect, reboot, shut down, sync the clock,
   reset the node database or factory-reset the radio.
-- **Messages**: chat per channel and per direct-message thread, replies, a 200-byte counter and
+- **Messages** (admins only): chat per channel and per direct-message thread, replies, a 200-byte counter and
   delivery status (sending, heard by the mesh, delivered, failed, unconfirmed). History is kept by
   Home Assistant, so nothing is lost while your phone is off.
 - **Nodes**: searchable, sortable list with hops, SNR, battery, distance and last-heard time.
@@ -48,7 +48,7 @@ uptime, nodes online/known, messages today, packet counters (disabled by default
 | `meshtastic_manager.delete_channel` | Delete a channel by `name` or `index` (later channels move up) |
 | `meshtastic_manager.join_channel` | Add channels from a share `url`; `replace: true` replaces all channels and the LoRa settings (radio reboots) |
 
-Channel actions require an administrator, or run from an automation.
+All actions, including `send_text`, require an administrator, or run from an automation.
 
 **Message event**: every new incoming text fires `meshtastic_manager_message`, and the
 `Message` event entity changes as well. The event data contains `text`, `from` (`!a1b2c3d4`),

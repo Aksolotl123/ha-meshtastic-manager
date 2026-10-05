@@ -256,13 +256,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         client.async_channels_changed()
         return result
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SEND_TEXT,
-        send_text,
-        schema=SEND_TEXT_SCHEMA,
-        supports_response=SupportsResponse.OPTIONAL,
-    )
+    # Admin-only for users; automations and scripts run without a user and may call it.
+    _register_admin(hass, SERVICE_SEND_TEXT, send_text, SEND_TEXT_SCHEMA, SupportsResponse.OPTIONAL)
     _register_admin(hass, SERVICE_ADD_CHANNEL, add_channel, ADD_CHANNEL_SCHEMA, SupportsResponse.OPTIONAL)
     _register_admin(
         hass, SERVICE_DELETE_CHANNEL, delete_channel, DELETE_CHANNEL_SCHEMA, SupportsResponse.OPTIONAL

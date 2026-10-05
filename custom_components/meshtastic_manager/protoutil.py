@@ -382,7 +382,7 @@ def redact_channel_secrets(channels: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def snapshot_for_user(data: dict[str, Any], is_admin: bool) -> dict[str, Any]:
-    """Strip channel keys from a panel snapshot unless the user is an admin.
+    """Strip channel keys and conversations from a snapshot unless the user is an admin.
 
     Only ``channels`` carries secrets (the other sections are LoRa settings,
     device info and node data with public keys); ``security`` config is only
@@ -390,7 +390,21 @@ def snapshot_for_user(data: dict[str, Any], is_admin: bool) -> dict[str, Any]:
     """
     if is_admin:
         return data
-    return {**data, "channels": redact_channel_secrets(data.get("channels") or [])}
+    return {
+        **data,
+        "channels": redact_channel_secrets(data.get("channels") or []),
+        "conversations": [],
+    }
+
+
+# Live events that carry message content or delivery state. Reading and sending
+# messages is admin-only, so these never reach non-admin subscribers.
+MESSAGE_EVENT_TYPES = frozenset({"message", "message_status"})
+
+
+def event_visible(event: dict[str, Any], is_admin: bool) -> bool:
+    """Return whether a live panel event may be forwarded to this user."""
+    return is_admin or event.get("type") not in MESSAGE_EVENT_TYPES
 
 
 def write_owner(

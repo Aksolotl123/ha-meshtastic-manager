@@ -104,12 +104,14 @@ def ws_entries(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
 async def ws_snapshot(hass, connection, msg, client: MeshtasticClient) -> None:
     """Return status, nodes, channels and conversation summaries.
 
-    Channel keys (PSK) are only sent to admins; other users get a placeholder.
+    Channel keys (PSK) and conversations are only sent to admins; other users
+    get a key placeholder and an empty conversation list.
     """
     from . import protoutil  # noqa: PLC0415
 
-    data = protoutil.snapshot_for_user(client.snapshot(), connection.user.is_admin)
+    data = client.snapshot()
     data["conversations"] = client.store.conversations()
+    data = protoutil.snapshot_for_user(data, connection.user.is_admin)
     data["is_admin"] = connection.user.is_admin
     connection.send_result(msg["id"], data)
 
@@ -120,11 +122,18 @@ async def ws_snapshot(hass, connection, msg, client: MeshtasticClient) -> None:
 @websocket_api.async_response
 @_with_client
 async def ws_subscribe(hass, connection, msg, client: MeshtasticClient) -> None:
-    """Stream live events (messages, nodes, status, acks, traceroutes)."""
+    """Stream live events (messages, nodes, status, acks, traceroutes).
+
+    Message events are only forwarded to admins.
+    """
+    from . import protoutil  # noqa: PLC0415
+
+    is_admin = connection.user.is_admin
 
     @callback
     def forward(event: dict[str, Any]) -> None:
-        connection.send_message(websocket_api.event_message(msg["id"], event))
+        if protoutil.event_visible(event, is_admin):
+            connection.send_message(websocket_api.event_message(msg["id"], event))
 
     connection.subscriptions[msg["id"]] = client.async_add_listener(forward)
     connection.send_result(msg["id"])
@@ -139,6 +148,7 @@ async def ws_subscribe(hass, connection, msg, client: MeshtasticClient) -> None:
         vol.Optional("limit", default=200): vol.All(int, vol.Range(min=1, max=1000)),
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 @_with_client
 async def ws_messages(hass, connection, msg, client: MeshtasticClient) -> None:
@@ -156,6 +166,7 @@ async def ws_messages(hass, connection, msg, client: MeshtasticClient) -> None:
         vol.Required("conversation"): str,
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 @_with_client
 async def ws_mark_read(hass, connection, msg, client: MeshtasticClient) -> None:
@@ -190,6 +201,7 @@ async def ws_delete_conversation(hass, connection, msg, client: MeshtasticClient
         vol.Optional("reply_id"): int,
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 @_with_client
 async def ws_send_text(hass, connection, msg, client: MeshtasticClient) -> None:
