@@ -102,8 +102,13 @@ def ws_entries(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
 @websocket_api.async_response
 @_with_client
 async def ws_snapshot(hass, connection, msg, client: MeshtasticClient) -> None:
-    """Return status, nodes, channels and conversation summaries."""
-    data = client.snapshot()
+    """Return status, nodes, channels and conversation summaries.
+
+    Channel keys (PSK) are only sent to admins; other users get a placeholder.
+    """
+    from . import protoutil  # noqa: PLC0415
+
+    data = protoutil.snapshot_for_user(client.snapshot(), connection.user.is_admin)
     data["conversations"] = client.store.conversations()
     data["is_admin"] = connection.user.is_admin
     connection.send_result(msg["id"], data)

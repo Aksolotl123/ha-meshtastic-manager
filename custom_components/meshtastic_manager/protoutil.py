@@ -351,6 +351,48 @@ def channel_share_url(iface: Any, index: int | None) -> str:
     return build_channel_url([channel.settings], node.localConfig.lora, add_only=index != 0)
 
 
+# Stands in for a channel key that non-admin users must not see. It is longer
+# than four characters so the panel still labels the channel "custom key", and
+# it is not valid base64, so it can never be mistaken for (or written as) a key.
+REDACTED_PSK = "redacted"
+
+
+def _redact_psk(psk: Any) -> Any:
+    """Keep "no encryption" and the public default-key index, hide real keys."""
+    if not psk:
+        return psk
+    try:
+        if len(base64.b64decode(psk, validate=True)) <= 1:
+            return psk
+    except (TypeError, ValueError):
+        pass
+    return REDACTED_PSK
+
+
+def redact_channel_secrets(channels: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return copies of channel dicts (from ``to_dict``) with their keys hidden."""
+    result = []
+    for channel in channels:
+        channel = dict(channel)
+        settings = channel.get("settings")
+        if isinstance(settings, dict) and "psk" in settings:
+            channel["settings"] = {**settings, "psk": _redact_psk(settings["psk"])}
+        result.append(channel)
+    return result
+
+
+def snapshot_for_user(data: dict[str, Any], is_admin: bool) -> dict[str, Any]:
+    """Strip channel keys from a panel snapshot unless the user is an admin.
+
+    Only ``channels`` carries secrets (the other sections are LoRa settings,
+    device info and node data with public keys); ``security`` config is only
+    returned by the admin-only ``config_get`` command.
+    """
+    if is_admin:
+        return data
+    return {**data, "channels": redact_channel_secrets(data.get("channels") or [])}
+
+
 def write_owner(
     iface: Any, long_name: str, short_name: str, is_licensed: bool, is_unmessagable: bool
 ) -> None:

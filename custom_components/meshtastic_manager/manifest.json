@@ -9,7 +9,7 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Aksolotl123/ha-meshtastic-manager/issues",
-  "loggers": ["meshtastic"],
+  "loggers": ["custom_components.meshtastic_manager"],
   "requirements": ["meshtastic==2.7.11"],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
