@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -15,6 +16,9 @@ from .const import (
     STORAGE_SAVE_DELAY,
     STORAGE_VERSION,
 )
+from .replay import SeenPackets
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MeshStore:
@@ -22,6 +26,7 @@ class MeshStore:
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         """Initialise the store."""
+        self._hass = hass
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}"
         )
@@ -29,6 +34,9 @@ class MeshStore:
         self.traceroutes: list[dict[str, Any]] = []
         # conversation key -> unix time the user last read it
         self.read_marks: dict[str, int] = {}
+        # Kept apart from the message log: deleting a conversation must not
+        # let its old packets be accepted again.
+        self.seen_direct = SeenPackets()
 
     async def async_load(self) -> None:
         """Load data from disk."""
@@ -36,6 +44,10 @@ class MeshStore:
         self.messages = data.get("messages", [])
         self.traceroutes = data.get("traceroutes", [])
         self.read_marks = data.get("read_marks", {})
+        if "seen_direct" in data:
+            self.seen_direct = SeenPackets(data["seen_direct"])
+        else:
+            self.seen_direct.seed(self.messages)
 
     async def async_remove(self) -> None:
         """Delete the stored file."""
@@ -50,6 +62,7 @@ class MeshStore:
             "messages": self.messages,
             "traceroutes": self.traceroutes,
             "read_marks": self.read_marks,
+            "seen_direct": self.seen_direct.as_dict(),
         }
 
     @callback
@@ -63,10 +76,30 @@ class MeshStore:
             for existing in reversed(self.messages[-200:]):
                 if existing.get("id") == message["id"] and existing.get("from") == message["from"]:
                     return False
+        pki = message.get("dir") == "in" and message.get("pki") and message.get("id")
+        if pki and self.seen_direct.is_full(message["from"]):
+            _LOGGER.warning(
+                "Too many senders of encrypted direct messages are tracked; "
+                "replays of messages from !%08x cannot be detected",
+                message["from"],
+            )
+        if pki and not self.seen_direct.check_and_add(message["from"], message["id"]):
+            _LOGGER.warning(
+                "Ignoring a repeated encrypted direct message from !%08x (packet %s): "
+                "it was already received before, possibly a replayed recording",
+                message["from"],
+                message["id"],
+            )
+            return False
         self.messages.append(message)
         if len(self.messages) > MAX_MESSAGES:
             del self.messages[: len(self.messages) - MAX_MESSAGES]
-        self._schedule_save()
+        if pki:
+            # Save the packet id of an authenticated direct message right away,
+            # so a crash cannot make it acceptable again.
+            self._hass.async_create_task(self.async_flush(), eager_start=False)
+        else:
+            self._schedule_save()
         return True
 
     @callback

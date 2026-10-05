@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/Aksolotl123/ha-meshtastic-manager/issues",
   "loggers": ["meshtastic"],
   "requirements": ["meshtastic==2.7.11"],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

@@ -59,6 +59,12 @@ the event again.
 
 **Blueprints**: control a lock from your Meshtastic radio.
 
+- **Unlock with a direct message**
+  ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_unlock_with_direct_message.yaml)):
+  you send `otwórz` / `open` as a direct message from your radio to the Home Assistant radio and
+  the lock opens, no code needed. Only PKI-encrypted direct messages (firmware 2.5+) are accepted;
+  channel messages and direct messages without PKI are ignored. Optionally the lock is locked
+  again after N minutes; your notification action runs after unlocking and relocking.
 - **Unlock with a one-time code**
   ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_unlock_with_code.yaml)):
   you send `otwórz` / `open`, Home Assistant answers with a random code of 4-6 digits, and the
@@ -72,7 +78,10 @@ the event again.
 Security notes: only the configured sender node is accepted. With a channel name, commands must
 arrive on that private channel. Anyone who knows the channel key can read the code there, so
 keep the key private. With the channel name left empty, only PKI-encrypted direct messages are
-accepted, which also authenticate the sender (recommended).
+accepted, which also authenticate the sender (recommended). PKI direct messages cannot be forged
+without the private key of one of the two radios. A recorded packet transmitted again later is
+ignored too: the integration permanently remembers the packet ids of the PKI direct messages it
+has received (the last 1000 per sender) and logs a warning when one comes again.
 
 Example notification on any direct message:
 
