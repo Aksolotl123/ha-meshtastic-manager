@@ -2,9 +2,10 @@ blueprint:
   name: Meshtastic - lock with a message
   description: >-
     Locks a lock immediately when a chosen Meshtastic radio sends the lock word
-    on a private channel (or as an encrypted direct message). Locking is always
-    safe, so no code is required. Use together with "unlock with a one-time
-    code".
+    as an encrypted direct message (PKI, firmware 2.5+) to the Home Assistant
+    radio. Locking is always safe, so no code is required. Channel messages and
+    direct messages without PKI are ignored. Use together with "unlock with a
+    one-time code" or "unlock with a direct message".
   domain: automation
   author: Meshtastic Manager
   source_url: https://github.com/Aksolotl123/ha-meshtastic-manager/blob/main/blueprints/automation/meshtastic_manager/lock_with_message.yaml
@@ -17,12 +18,6 @@ blueprint:
     sender:
       name: Allowed sender
       description: Node ID of the radio you carry, for example !a1b2c3d4.
-      selector:
-        text:
-    channel_name:
-      name: Channel name
-      description: Leave empty to accept only encrypted direct messages.
-      default: ""
       selector:
         text:
     lock_entity:
@@ -52,10 +47,8 @@ max: 5
 variables:
   radio: !input radio
   sender: !input sender
-  channel_name: !input channel_name
   lock_entity: !input lock_entity
   lock_words: !input lock_words
-  reply_to: "{{ '' if channel_name else sender }}"
 
 triggers:
   - trigger: event
@@ -63,14 +56,13 @@ triggers:
     event_data:
       entry_id: !input radio
       from: !input sender
+      direct: true
+      pki: true
 
 conditions:
   - condition: template
     value_template: >-
-      {% set d = trigger.event.data %}
-      {% set path_ok = (d.channel_name == channel_name and not d.direct)
-         if channel_name else (d.direct and d.pki) %}
-      {{ path_ok and (d.text | trim | lower) in (lock_words | map('lower') | list) }}
+      {{ (trigger.event.data.text | trim | lower) in (lock_words | map('lower') | list) }}
 
 actions:
   - action: lock.lock
@@ -82,8 +74,7 @@ actions:
   - action: meshtastic_manager.send_text
     data:
       config_entry_id: "{{ radio }}"
-      to: "{{ reply_to }}"
-      channel_name: "{{ channel_name }}"
+      to: "{{ sender }}"
       text: >-
         {{ 'Zamknięto' if is_state(lock_entity, 'locked') else 'Błąd: zamek ' ~ states(lock_entity) }}
   - variables:

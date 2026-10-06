@@ -5,9 +5,10 @@ blueprint:
     answers the random code (4-6 digits) Home Assistant sends back. A recorded
     or replayed message cannot open the lock because the code changes every
     time, and each code accepts only one answer.
-    Without a channel name only encrypted direct messages (PKI, firmware 2.5+)
-    are accepted, which also prove who the sender is. On a channel, anyone who
-    knows the channel key can read the code, so keep that key private.
+    Only encrypted direct messages (PKI, firmware 2.5+) to the Home Assistant
+    radio are accepted, both for the open word and for the code: they prove who
+    the sender is and nobody else can read the code. Channel messages and
+    direct messages without PKI are ignored and do not use up the attempt.
   domain: automation
   author: Meshtastic Manager
   source_url: https://github.com/Aksolotl123/ha-meshtastic-manager/blob/main/blueprints/automation/meshtastic_manager/lock_unlock_with_code.yaml
@@ -20,14 +21,6 @@ blueprint:
     sender:
       name: Allowed sender
       description: Node ID of the radio you carry, for example !a1b2c3d4.
-      selector:
-        text:
-    channel_name:
-      name: Channel name
-      description: >-
-        Private channel the commands arrive on. Leave empty to accept only
-        encrypted direct messages to the Home Assistant radio (more secure).
-      default: ""
       selector:
         text:
     lock_entity:
@@ -86,14 +79,11 @@ max_exceeded: silent
 variables:
   radio: !input radio
   sender: !input sender
-  channel_name: !input channel_name
   lock_entity: !input lock_entity
   open_words: !input open_words
   code_length: !input code_length
   code_timeout: !input code_timeout
   relock_minutes: !input relock_minutes
-  # Replies go back the way the command came: on the channel, or as a DM.
-  reply_to: "{{ '' if channel_name else sender }}"
 
 triggers:
   - trigger: event
@@ -101,15 +91,14 @@ triggers:
     event_data:
       entry_id: !input radio
       from: !input sender
+      direct: true
+      pki: true
 
 conditions:
-  - alias: Open word from the allowed path
+  - alias: Open word
     condition: template
     value_template: >-
-      {% set d = trigger.event.data %}
-      {% set path_ok = (d.channel_name == channel_name and not d.direct)
-         if channel_name else (d.direct and d.pki) %}
-      {{ path_ok and (d.text | trim | lower) in (open_words | map('lower') | list) }}
+      {{ (trigger.event.data.text | trim | lower) in (open_words | map('lower') | list) }}
 
 actions:
   - variables:
@@ -121,32 +110,32 @@ actions:
   - action: meshtastic_manager.send_text
     data:
       config_entry_id: "{{ radio }}"
-      to: "{{ reply_to }}"
-      channel_name: "{{ channel_name }}"
+      to: "{{ sender }}"
       text: "Kod: {{ code }} ({{ code_timeout }} s)"
   - variables:
       notify_message: "Meshtastic: {{ who }} prosi o otwarcie ({{ state_attr(lock_entity, 'friendly_name') }}), wysłano kod."
   - choose: []
     default: !input notify
+  # Only a PKI direct message from the sender counts as the answer, so a
+  # channel message or broadcast cannot use up the attempt.
   - wait_for_trigger:
       - trigger: event
         event_type: meshtastic_manager_message
         event_data:
           entry_id: !input radio
           from: !input sender
+          direct: true
+          pki: true
     timeout:
       seconds: "{{ code_timeout }}"
     continue_on_timeout: true
   - choose:
       - conditions:
-          - alias: Correct code from the same path
+          - alias: Correct code
             condition: template
             value_template: >-
               {% if wait.trigger %}
-                {% set d = wait.trigger.event.data %}
-                {% set path_ok = (d.channel_name == channel_name and not d.direct)
-                   if channel_name else (d.direct and d.pki) %}
-                {{ path_ok and (d.text | trim) == (code | string) }}
+                {{ (wait.trigger.event.data.text | trim) == (code | string) }}
               {% else %}false{% endif %}
         sequence:
           - action: lock.unlock
@@ -158,8 +147,7 @@ actions:
           - action: meshtastic_manager.send_text
             data:
               config_entry_id: "{{ radio }}"
-              to: "{{ reply_to }}"
-              channel_name: "{{ channel_name }}"
+              to: "{{ sender }}"
               text: >-
                 {{ 'Otwarto' if is_state(lock_entity, 'unlocked') else 'Błąd: zamek ' ~ states(lock_entity) }}
           - variables:
@@ -183,8 +171,7 @@ actions:
                   - action: meshtastic_manager.send_text
                     data:
                       config_entry_id: "{{ radio }}"
-                      to: "{{ reply_to }}"
-                      channel_name: "{{ channel_name }}"
+                      to: "{{ sender }}"
                       text: "Zamknięto automatycznie"
                   - variables:
                       notify_message: "Meshtastic: {{ state_attr(lock_entity, 'friendly_name') }} zamknięty automatycznie po {{ relock_minutes }} min."
@@ -194,8 +181,7 @@ actions:
       - action: meshtastic_manager.send_text
         data:
           config_entry_id: "{{ radio }}"
-          to: "{{ reply_to }}"
-          channel_name: "{{ channel_name }}"
+          to: "{{ sender }}"
           text: "Zły kod albo minął czas. Spróbuj za 30 s."
       - variables:
           notify_message: "Meshtastic: NIEUDANA próba otwarcia {{ state_attr(lock_entity, 'friendly_name') }} ({{ who }}) - zły kod albo brak odpowiedzi."

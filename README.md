@@ -77,12 +77,12 @@ event to use the text or the sender.
   after N minutes, and every attempt, successful or not, triggers your notification action.
 - **Lock with a message**
   ([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FAksolotl123%2Fha-meshtastic-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmeshtastic_manager%2Flock_with_message.yaml)):
-  `zamknij` / `lock` locks immediately.
+  `zamknij` / `lock` sent as a direct message locks immediately.
 
-Security notes: only the configured sender node is accepted. With a channel name, commands must
-arrive on that private channel. Anyone who knows the channel key can read the code there, so
-keep the key private. With the channel name left empty, only PKI-encrypted direct messages are
-accepted, which also authenticate the sender (recommended). PKI direct messages cannot be forged
+Security notes: only the configured sender node is accepted, and all three blueprints accept only
+PKI-encrypted direct messages to the Home Assistant radio (firmware 2.5+), which also authenticate
+the sender. Channel messages are ignored, so the security of the lock never depends on a channel
+key, and a message on a channel cannot use up a code attempt. PKI direct messages cannot be forged
 without the private key of one of the two radios. A recorded packet transmitted again later is
 ignored too: the integration permanently remembers the packet ids of the PKI direct messages it
 has received (the last 1000 per sender) and logs a warning when one comes again.
