@@ -407,6 +407,30 @@ def event_visible(event: dict[str, Any], is_admin: bool) -> bool:
     return is_admin or event.get("type") not in MESSAGE_EVENT_TYPES
 
 
+# Fields of the meshtastic_manager_message bus event that may also appear in the
+# attributes of the Message event entity. Entity attributes (and their history
+# and logbook) are visible to EVERY Home Assistant user, while message content
+# is admin-only - so the text and the sender stay in the bus event (its
+# subscription requires an admin; automations and blueprints receive it).
+EVENT_ENTITY_FIELDS = (
+    "message_id",
+    "to",
+    "direct",
+    "channel",
+    "channel_name",
+    "pki",
+    "hops",
+    "snr",
+    "rssi",
+    "via_mqtt",
+)
+
+
+def event_entity_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Return the message event data without text, sender and entry id."""
+    return {key: data[key] for key in EVENT_ENTITY_FIELDS if key in data}
+
+
 def write_owner(
     iface: Any, long_name: str, short_name: str, is_licensed: bool, is_unmessagable: bool
 ) -> None:

@@ -21,8 +21,8 @@ for automations.
   Home Assistant, so nothing is lost while your phone is off.
 - **Nodes**: searchable, sortable list with hops, SNR, battery, distance and last-heard time.
   Node details show position, device and environment metrics and traceroute results. From there
-  you can send a DM, run a traceroute, request position, telemetry or user info, and mark the node
-  as favourite or ignored, or remove it.
+  admins can send a DM, run a traceroute, request position, telemetry or user info (each request
+  is a radio transmission), and mark the node as favourite or ignored, or remove it.
 - **Map**: nodes coloured by how recently they were heard, plus traceroute paths. Tiles come
   through Home Assistant's own OpenStreetMap proxy.
 - **Channels** (admins only): create a channel (name, random/default/own key or none, position
@@ -35,7 +35,8 @@ for automations.
 
 **Entities** for the local radio: connectivity, battery, voltage, channel utilisation, airtime,
 uptime, nodes online/known, messages today, packet counters (disabled by default), and a
-`Message` event entity (`direct_message` / `channel_message`).
+`Message` event entity (`direct_message` / `channel_message`). Its attributes are visible to every
+Home Assistant user, so they carry only message metadata, never the text or the sender.
 
 ## Automations
 
@@ -55,7 +56,10 @@ All actions, including `send_text`, require an administrator, or run from an aut
 `from_num`, `from_name`, `from_short_name`, `direct`, `channel`, `channel_name`, `pki`
 (true for direct messages encrypted with the sender's key, firmware 2.5+), `hops`, `snr`,
 `rssi`, `via_mqtt`, `message_id`, `entry_id`. Retransmissions of the same packet do not fire
-the event again.
+the event again. The `Message` event entity carries the same fields **without** `text`,
+`from`, `from_num`, `from_name`, `from_short_name` and `entry_id` (reading messages is
+admin-only, entity attributes are not) — trigger automations on the `meshtastic_manager_message`
+event to use the text or the sender.
 
 **Blueprints**: control a lock from your Meshtastic radio.
 

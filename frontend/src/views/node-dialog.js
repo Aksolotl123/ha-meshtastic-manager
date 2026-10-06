@@ -68,8 +68,8 @@ class MmNodeDialog extends LitElement {
           <button class="icon" @click=${this._close} title=${t("close")}><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
         <div class="body">
-          ${isMe
-            ? ""
+          ${isMe || !p.isAdmin
+            ? "" /* DMs and node requests (radio transmissions) are admin-only */
             : html`<div class="actions">
                 <button class="btn primary" @click=${() => p.openDm(this.num)}>
                   <ha-icon icon="mdi:message-text"></ha-icon>${t("send_dm")}

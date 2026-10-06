@@ -1939,7 +1939,7 @@ svg.leaflet-image-layer.leaflet-interactive path {\r
           <button class="icon" @click=${this._close} title=${s("close")}><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
         <div class="body">
-          ${d?"":v`<div class="actions">
+          ${d||!n.isAdmin?"":v`<div class="actions">
                 <button class="btn primary" @click=${()=>n.openDm(this.num)}>
                   <ha-icon icon="mdi:message-text"></ha-icon>${s("send_dm")}
                 </button>

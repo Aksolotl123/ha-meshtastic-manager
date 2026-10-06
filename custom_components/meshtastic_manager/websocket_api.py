@@ -226,10 +226,14 @@ async def ws_send_text(hass, connection, msg, client: MeshtasticClient) -> None:
         vol.Optional("channel", default=0): vol.All(int, vol.Range(min=0, max=7)),
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 @_with_client
 async def ws_node_request(hass, connection, msg, client: MeshtasticClient) -> None:
-    """Send a request to a remote node (response arrives as an event)."""
+    """Send a request to a remote node (response arrives as an event).
+
+    Admin-only: every request is a radio transmission (airtime on a shared mesh).
+    """
     handler = {
         "traceroute": client.async_traceroute,
         "position": client.async_request_position,

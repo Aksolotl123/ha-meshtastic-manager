@@ -106,3 +106,42 @@ def test_message_events_only_for_admins():
         assert not protoutil.event_visible(event, is_admin=False)
     assert protoutil.event_visible(node, is_admin=False)
     assert protoutil.event_visible({"type": "status"}, is_admin=False)
+
+
+def test_event_entity_data_has_no_text_or_sender():
+    """The Message event entity's attributes are visible to every user."""
+    bus_data = {
+        "entry_id": "abc123",
+        "message_id": 42,
+        "text": "tajne",
+        "from": "!a1b2c3d4",
+        "from_num": 0xA1B2C3D4,
+        "from_name": "Jan Kowalski",
+        "from_short_name": "JK",
+        "to": "!00000001",
+        "direct": True,
+        "channel": 0,
+        "channel_name": None,
+        "pki": True,
+        "hops": 1,
+        "snr": 5.5,
+        "rssi": -90,
+        "via_mqtt": False,
+    }
+    data = protoutil.event_entity_data(bus_data)
+    for key in ("entry_id", "text", "from", "from_num", "from_name", "from_short_name"):
+        assert key not in data
+    dumped = json.dumps(data)
+    for secret in ("tajne", "a1b2c3d4", "Kowalski", "JK", "abc123"):
+        assert secret not in dumped
+    assert data["direct"] is True
+    assert data["message_id"] == 42
+    assert data["channel"] == 0
+    # The bus event data itself is untouched (blueprints read text/from_name).
+    assert bus_data["text"] == "tajne" and bus_data["from_name"] == "Jan Kowalski"
+
+
+def test_event_entity_data_filters_restored_attributes():
+    """Attributes restored from an older version lose text and sender too."""
+    restored = {"text": "tajne", "from_name": "Jan", "direct": False, "channel": 1}
+    assert protoutil.event_entity_data(restored) == {"direct": False, "channel": 1}
